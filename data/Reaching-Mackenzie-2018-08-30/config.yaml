@@ -1,0 +1,42 @@
+Task: Reaching
+TrainingFraction:
+- 0.95
+alphavalue: 0.7
+batch_size: 4
+bodyparts:
+- Hand
+- Finger1
+- Tongue
+- Joystick1
+- Joystick2
+colormap: jet
+corner2move2:
+- 50
+- 50
+cropping: false
+date: Aug30
+default_net_type: resnet_50
+dotsize: 12
+iteration: 0
+move2corner: true
+numframes2pick: 40
+pcutoff: 0.4
+project_path: data/Reaching-Mackenzie-2018-08-30
+resnet: null
+scorer: Mackenzie
+skeleton:
+- - Hand
+  - Finger1
+- - Joystick1
+  - Joystick2
+skeleton_color: blue
+snapshotindex: -1
+start: 0
+stop: 1
+video_sets:
+  videos/reachingvideo1.avi:
+    crop: 0, 832, 0, 747
+x1: 0
+x2: 640
+y1: 277
+y2: 624
