@@ -520,7 +520,7 @@ def evaluate_dgp(proj_cfg_file, dgp_model_file, shuffle=1, loc_ref=None, loc_ref
 
 def plot_dgp(
         video_file, output_dir='', label_dir=None, proj_cfg_file=None, dgp_model_file=None,
-        shuffle=1, dotsize=3, colormap='jet', save_str=''):
+        shuffle=1, dotsize=3, colormap='jet', save_str='', mask_threshold=0.1):
     """Produce video overlaid with predicted markers.
 
     Parameters
@@ -544,7 +544,8 @@ def plot_dgp(
         matplotlib color map for markers
     save_str : str, optional
         additional string to append to video file name
-
+    mask_threshold : float
+        when plotting videos, masks all markers with likelihoods lower than specified threshold.
     Returns
     -------
     str
@@ -568,11 +569,13 @@ def plot_dgp(
 
     video_clip = VideoFileClip(str(video_file))
 
+    mask_array = labels['likelihoods'].T > mask_threshold
     # make movie
     create_annotated_movie(
             video_clip,
             labels['x'].T,
             labels['y'].T,
+            mask_array=mask_array,
             filename=save_file, dotsize=dotsize, colormap=colormap)
 
     video_clip.close()

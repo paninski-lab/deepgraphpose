@@ -220,30 +220,19 @@ if __name__ == '__main__':
             , flush=True)
         if test:
             step = 2
+            gm2, gm3= 1, 3
             fit_dgp(snapshot,
                     dlcpath,
                     batch_size=batch_size,
                     shuffle=shuffle,
                     step=step,
                     maxiters=5,
-                    displayiters=1)
-        else:
-            step = '2oc0'
-            gm2, gm3 = 0, 0
-            maxiters, nepoch = 1000, 1
-            fit_dgp(snapshot,
-                    dlcpath,
-                    batch_size=batch_size,
-                    shuffle=shuffle,
-                    step=step,
+                    displayiters=1,
                     gm2=gm2,
-                    gm3=gm3,
-                    maxiters=maxiters)
-
-            snapshot = 'snapshot-step{}-final--0'.format(step)
-
-            step = '2oc1'
-            gm2, gm3, nepoch = 2, 3, 99
+                    gm3=gm3)
+        else:
+            step = 2
+            gm2, gm3 = 1, 3
             fit_dgp(snapshot,
                     dlcpath,
                     batch_size=batch_size,

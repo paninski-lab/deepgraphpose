@@ -547,7 +547,8 @@ def fit_dgp_labeledonly(
 
 def fit_dgp(
         snapshot, dlcpath, batch_size=10, shuffle=1, step=2, saveiters=1000, displayiters=5,
-        maxiters=200000, ns=10, nc=2048, n_max_frames=2000, gm2=0, gm3=0, nepoch=100, wt=0, aug=True):
+        maxiters=200000, ns=10, nc=2048, n_max_frames=2000, gm2=0, gm3=0, nepoch=100, wt=0, aug=True,
+        debug=''):
     """Run DGP.
     Parameters
     ----------
@@ -652,7 +653,7 @@ def fit_dgp(
     dgp_cfg.aug = aug  # data augmentation
 
     # skip this DGP step if it's already done.
-    model_name = dgp_cfg.snapshot_prefix + '-step{}-final--0.index'.format(step)
+    model_name = dgp_cfg.snapshot_prefix + '-step{}{}-final--0.index'.format(step, debug)
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP has already been run.', flush=True)
         return None
@@ -827,11 +828,13 @@ def fit_dgp(
 
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
-            model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-'
+            model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug)+ '-'
+            #print('Storing model {}'.format(model_name))
             saver.save(sess, model_name, global_step=it)
             saver.save(sess, model_name, global_step=0)
             if (it + 1) == maxiters:
-                model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-final-'
+                model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug) +'-final-'
+                #print('Storing model {}'.format(model_name))
                 saver.save(sess, model_name, global_step=0)
 
     time_end = time.time()
