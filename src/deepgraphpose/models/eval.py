@@ -11,6 +11,7 @@ from skimage.draw import circle
 from skimage.util import img_as_ubyte
 from tqdm import tqdm
 from pathlib import Path
+from PIL import Image
 vers = tf.__version__.split('.')
 if int(vers[0]) == 1 and int(vers[1]) > 12:
     TF = tf.compat.v1
@@ -224,7 +225,7 @@ def setup_dgp_eval_graph(dlc_cfg, dgp_model_file, loc_ref=False, gauss_len=1, ga
 
 def estimate_pose(
         proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle=1, save_pose=True,
-        save_str=''):
+        save_str='', new_size=None):
     """Estimate pose on an arbitrary video.
 
     Parameters
@@ -243,6 +244,8 @@ def estimate_pose(
         True to save out pose in csv/hdf5 file
     save_str : str, optional
         additional string to append to labeled video file name
+    new_size : tuple, optional
+        Size for resizing frames (height, width)
 
     Returns
     -------
@@ -279,21 +282,33 @@ def estimate_pose(
     # -------------------
     try:
         dlc_cfg.net_type = 'resnet_50'
-        sess, mu_n, _, _, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
+        sess, mu_n, softmax_tensor, scmap_tf, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
     except:
         dlc_cfg.net_type = 'resnet_101'
-        sess, mu_n, _, _, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
-        
+        sess, mu_n, softmax_tensor, scmap_tf, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
+    
     print('\n')
     pbar = tqdm(total=n_frames, desc='processing video frames')
     markers = np.zeros((n_frames, dlc_cfg.num_joints, 2))
     likelihoods = np.zeros((n_frames, dlc_cfg.num_joints))
+
     for i, frame in enumerate(video_clip.iter_frames()):
+        if new_size is not None:
+            frame = Image.fromarray(frame)
+            scale_x = frame.width / new_size[1]
+            scale_y = frame.height / new_size[0]
+            # width, height
+            frame = frame.resize(size=(new_size[1], new_size[0]))
+            frame = np.asarray(frame)
+        else:
+            scale_x = 1
+            scale_y = 1
+
         # get resnet output
         ff = img_as_ubyte(frame)
-        mu_n_batch = sess.run(mu_n, feed_dict={inputs: ff[None, :, :, :]})
+        mu_n_batch, softmax_tensor_batch, scmap_tf_batch = sess.run([mu_n, softmax_tensor, scmap_tf], feed_dict={inputs: ff[None, :, :, :]})
         markers[i] = mu_n_batch * dlc_cfg.stride + 0.5 * dlc_cfg.stride
-        likelihoods[i] = 0.5
+        likelihoods[i] = np.max(np.max(softmax_tensor_batch, axis=1), axis=1)
 
         pbar.update(1)
 
@@ -305,8 +320,8 @@ def estimate_pose(
     # save labels
     # -------------------
     labels = {
-        'x': markers[:, :, 1],
-        'y': markers[:, :, 0],
+        'x': markers[:, :, 1] * scale_x,
+        'y': markers[:, :, 0] * scale_y,
         'likelihoods': likelihoods}
 
     # convert to DLC-like csv/hdf5
