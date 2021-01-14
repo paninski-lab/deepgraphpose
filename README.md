@@ -111,4 +111,9 @@ python ['{DGP_DIR}/demo/run_dgp_demo.py'] --dlcpath "{PROJ_DIR}/task-scorer-date
 ```
 6. The output of the pipeline, including the labeled videos and the pickle files with predicted trajectories will be stored in "{PROJ_DIR}/task-scorer-date/videos_pred".
 
+## Try DGP on the cloud:
+You can run DGP with GPUs on the cloud for free using [NeuroCAAS](http://www.neurocaas.org). The current DGP implementation in NeuroCAAS is in beta mode so we are looking for feedback from beta users. If you are interested please email [neurocaas@gmail.com](mailto:neurocaas@gmail.com) once you sign up to NeuroCAAS to get started.
+
+
+
 
