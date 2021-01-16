@@ -38,12 +38,12 @@ def get_args():
     parser.add_argument(
         "--snapshot",
         type=str,
-        default="/Volumes/paninski-locker/data/ibl/dlc-networks/paw2-mic-2020-03-23/dlc-models/iteration-0/paw2Mar23-trainset95shuffle1/train/snapshot-step4oc0--gm21--gm3--3-final--0",
+        required=True
     )
     parser.add_argument(
         "--config",
         type=str,
-        default="/Volumes/paninski-locker/data/ibl/dlc-networks/paw2-mic-2020-03-23/config_sun.yaml",
+        required=True
     )
     parser.add_argument("--dot_sizes", type=int, nargs="+", default=3)
     parser.add_argument("--new_hw", type=int, nargs="+")
