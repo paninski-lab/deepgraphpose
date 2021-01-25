@@ -548,7 +548,7 @@ def fit_dgp_labeledonly(
 def fit_dgp(
         snapshot, dlcpath, batch_size=10, shuffle=1, step=2, saveiters=1000, displayiters=5,
         maxiters=200000, ns=10, nc=2048, n_max_frames=2000, gm2=0, gm3=0, nepoch=100, wt=0, aug=True,
-        debug=''):
+        debug='', trainingsetindex=0):
     """Run DGP.
     Parameters
     ----------
@@ -585,7 +585,6 @@ def fit_dgp(
     config_path = dlc_base_path / 'config.yaml'
     print('config_path', config_path)
     cfg = auxiliaryfunctions.read_config(config_path)
-    trainingsetindex = 0
     modelfoldername = auxiliaryfunctions.GetModelFolder(
         cfg["TrainingFraction"][trainingsetindex], shuffle, cfg)
 
