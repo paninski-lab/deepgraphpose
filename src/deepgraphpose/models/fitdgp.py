@@ -51,7 +51,8 @@ else:
 
 # %%
 def fit_dlc(
-        snapshot, dlcpath, shuffle=1, step=0, saveiters=1000, displayiters=100, maxiters=200000):
+        snapshot, dlcpath, shuffle=1, step=0, saveiters=1000, displayiters=100, maxiters=200000,
+trainingsetindex=0):
     """Run the original DLC code.
     Parameters
     ----------
@@ -80,7 +81,6 @@ def fit_dlc(
     config_path = dlc_base_path / 'config.yaml'
     print('config_path', config_path)
     cfg = auxiliaryfunctions.read_config(config_path)
-    trainingsetindex = 0
     modelfoldername = auxiliaryfunctions.GetModelFolder(
         cfg["TrainingFraction"][trainingsetindex], shuffle, cfg)
     pose_config_yaml = Path(
@@ -255,7 +255,7 @@ def fit_dlc(
 
 def fit_dgp_labeledonly(
         snapshot, dlcpath, shuffle=1, step=1, saveiters=1000, displayiters=5, maxiters=50000,
-        ns=10, nc=2048, n_max_frames=2000, aug=True):
+        ns=10, nc=2048, n_max_frames=2000, aug=True,trainingsetindex=0):
     """Run the DGP with labeled frames only.
     Parameters
     ----------
@@ -290,7 +290,6 @@ def fit_dgp_labeledonly(
     config_path = dlc_base_path / 'config.yaml'
     print('config_path', config_path)
     cfg = auxiliaryfunctions.read_config(config_path)
-    trainingsetindex = 0
     modelfoldername = auxiliaryfunctions.GetModelFolder(
         cfg["TrainingFraction"][trainingsetindex], shuffle, cfg)
 
