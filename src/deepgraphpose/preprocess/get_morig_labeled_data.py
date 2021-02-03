@@ -193,7 +193,6 @@ def create_labels_md(config_path, video_path, scorer, overwrite_flag=False, chec
            rel_video_path = str(Path.resolve(Path(video)))
         except:
            rel_video_path = os.readlink(str(video))
-    
         rel_video_path_parent = Path(rel_video_path).parent / 'dlc_labels_check.npy'
         videoname = Path(rel_video_path).name
         frames_index_keep = np.load(str(rel_video_path_parent), allow_pickle=True)[()]['keep']
@@ -214,7 +213,7 @@ def create_labels_md(config_path, video_path, scorer, overwrite_flag=False, chec
         local_extract_frames_md(config_path, frames2pick, video)
     
         #%
-        vname = videoname.split(".")[0]
+        vname = videoname.rsplit(".",1)[0]
         csv_file = (
                 project_path
                 / "labeled-data"
@@ -237,12 +236,11 @@ def create_labels_md(config_path, video_path, scorer, overwrite_flag=False, chec
             # num_bodyparts = len(cfg["bodyparts"])
         
             # clip = VideoFileClip(str(videofile_path))
-            data = np.load(str(rel_video_path).split(".")[0] + ".npy", allow_pickle=True)[()]
+            data = np.load(str(rel_video_path).rsplit(".",1)[0] + ".npy", allow_pickle=True)[()]
             xr = data["xr"]
             yr = data["yr"]
-        
             # Extracts the frame number
-            extract_frame_num = lambda x: int(x.split("/")[-1].split(".")[0][3:])
+            extract_frame_num = lambda x: int(x.split("/")[-1].rsplit(".",1)[0][3:])
         
             # As this next step is manual, we update the labels by putting them on the diagonal (fixed for all frames)
             for index, bodypart in enumerate(cfg["bodyparts"]):
