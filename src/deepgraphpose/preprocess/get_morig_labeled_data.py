@@ -178,7 +178,7 @@ def create_labels(task, date, overwrite_flag=False, check_labels=False, verbose=
 
 
 #%%
-def create_labels_md(config_path, video_path, scorer, overwrite_flag=False, check_labels=False, verbose=False):
+def create_labels_md(config_path, video_path, scorer, overwrite_flag=False, check_labels=False, verbose=False,seed= None):
     from deepgraphpose.utils_data import local_extract_frames_md
     from deeplabcut.utils import auxiliaryfunctions
 
@@ -202,10 +202,12 @@ def create_labels_md(config_path, video_path, scorer, overwrite_flag=False, chec
         
         #%
         if cfg["numframes2pick"] is not None:
+            np.random.seed(seed) ## option to set seed. 
             assert len(np.unique(frames_index_keep)) >= cfg["numframes2pick"]
             frames2pick = np.sort(
                 np.random.choice(frames_index_keep, cfg["numframes2pick"], replace=False)
             )
+            np.random.seed() ## make sure we return to randomness 
         else:
             frames2pick = frames_index_keep
         numframes2pick += [len(frames2pick)]
