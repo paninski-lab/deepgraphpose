@@ -678,7 +678,9 @@ def fit_dgp(
     # ------------------------------------------------------------------------------------
     # Build model
     # ------------------------------------------------------------------------------------
+    # todo: what does this line mean?
     TF.reset_default_graph()
+    # todo: loss computed here?
     loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg)
     learning_rate = TF.placeholder(tf.float32, shape=[])
 
@@ -701,6 +703,7 @@ def fit_dgp(
     else:
         sess = TF.Session()
 
+    # todo: gradients computed here?
     # Set up optimizer
     all_train_vars = TF.trainable_variables()
     optimizer = TF.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
@@ -709,6 +712,7 @@ def fit_dgp(
     gradients, _ = TF.clip_by_global_norm(gradients, 10.0)
     train_op = optimizer.apply_gradients(zip(gradients, variables))
 
+    # todo: what is happening here?
     sess.run(TF.global_variables_initializer())
     sess.run(TF.local_variables_initializer())
 
@@ -727,6 +731,7 @@ def fit_dgp(
     pdata = PoseDataset(dgp_cfg)
     data_batcher.reset()
 
+    # todo: training starts here
     # %%
     print('Begin Training for {} iterations'.format(maxiters))
     if dgp_cfg.aug:
@@ -756,9 +761,18 @@ def fit_dgp(
         hidden_frame_batch_i = np.sort(
             np.array([i for i in all_frame_batch if (i in all_frame_i) and (i not in visible_frame_i)]))
 
-        (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
-         all_marker_batch, addn_batch_info), d = \
-            data_batcher.next_batch(0, dataset_i, visible_frame_batch_i, hidden_frame_batch_i)
+        # todo: this loop should be conditional based on how many videos are in the data_batcher?
+        # todo: rewrite this to BE a part of the data_batcher?
+        all_data_batch_ids = []
+        for dataset_id in range(len(data_batcher.datasets)):
+            (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
+              all_marker_batch, addn_batch_info), d = \
+                 data_batcher.next_batch(0, dataset_i, visible_frame_batch_i, hidden_frame_batch_i)
+            all_data_batch_ids.append(all_data_batch)
+
+        # (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
+        #  all_marker_batch, addn_batch_info), d = \
+        #     data_batcher.next_batch(0, dataset_i, visible_frame_batch_i, hidden_frame_batch_i)
         nt_batch = len(visible_frame) + len(hidden_frame)
         visible_marker, hidden_marker, visible_marker_in_targets = addn_batch_info
         all_frame = np.sort(list(visible_frame) + list(hidden_frame))
@@ -766,7 +780,7 @@ def fit_dgp(
 
         # batch data for placeholders
         if dgp_cfg.wt > 0:
-            vector_field = learn_wt(all_data_batch)  # vector field from optical flow
+            vector_field = learn_wt(all_data_batch)  # vector field from optical flow # todo: optical flow?
         else:
             vector_field = np.zeros((1,1,1))
         wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg.wt
@@ -972,7 +986,7 @@ def dgp_loss(data_batcher, dgp_cfg):
     targets_gauss = targets_gauss / gauss_max
     targets_gauss = TF.transpose(TF.reshape(targets_gauss, [-1, nj, nx_out, ny_out]), [0, 2, 3, 1])
 
-    # Now calculate the cross entropy given the network outputs and the Gaussian targets
+    # Now calculate the cross entropy given the network outputs and the Gaussian targets # todo: cross entropy computed here?
     n_hidden_frames_batch = TF.cast(TF.shape(hidden_marker_pl)[0], tf.float32)  # number of hidden markers in the batch
     n_visible_frames_batch = TF.cast(TF.shape(visible_marker_pl)[0],
                                      tf.float32)  # number of hidden markers in the batch
@@ -1119,6 +1133,19 @@ def dgp_loss(data_batcher, dgp_cfg):
         loss['wt_loss'] = loss['wt_loss'] * n_visible_frames_total / n_visible_frames_batch / (
                 n_visible_frames_total + n_hidden_frames_total) / wn_visible_tf
         total_loss += loss['wt_loss']
+
+    # Epipolar loss
+    # IF multiple views are provided
+    # make pairs of views
+    # for each pair of views:
+        # Compute F (fundamental matrix) for the views
+        # for each pair of points in view: # todo: obviously this will be vectorized -- not in loop form
+            # loss = ||x1F|| + ||Fx2||
+
+    # todo: not gonna lie, I don't fully understand how this method works, it seems to be called outside of training
+    #       How does this function know anything about the actual datapoints it's dealing with, let alone the predictions
+    #       from the model needed to compute the loss.
+
 
     loss['total_loss'] = total_loss
 
