@@ -7,7 +7,7 @@ You can run the DGP pipeline on the example dataset provided in this repo by run
 python demo/run_dgp_demo.py --dlcpath data/Reaching-Mackenzie-2018-08-30
 ```
 
-The output of the pipeline, including the labeled videos and the h5/csv files with predicted trajectories will be stored in `{DGP_DIR}/data/Reaching-Mackenzie-2018-08-30/videos_pred`.
+The output of the pipeline, including the labeled videos and the h5/csv files with predicted trajectories will be stored in `{DGP_DIR}/data/Reaching-Mackenzie-2018-08-30/videos_pred`. You can see information about training statistics in the file `{DGP_DIR}/data/dlc-models/iteration-0/ReachingAug30-trainset95shuffle1/train/learning_stats.csv`.
 
 You can run the DGP pipeline on your own dataset as long as it exists in a DLC file directory structure, for example
 

@@ -36,7 +36,11 @@ def update_config_files(dlcpath):
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
         video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
-        yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
+        try:
+            yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
+        except KeyError:    
+            ## check if update has already been done. 
+            assert yaml_cfg["video_sets"].get(video_loc,False), "Can't find original or updated video path in config file."
     with open(proj_cfg_path, 'w') as f:
         yaml.dump(yaml_cfg, f)
 
