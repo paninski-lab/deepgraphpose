@@ -1,5 +1,6 @@
 import tensorflow as tf
 import cv2 as cv
+import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -17,19 +18,31 @@ def get_img_points(df, img_name):
     # convert to list
     img_lbls = img_lbls.to_numpy(dtype=float)
     # get points
-    points = []
-    for i in range(img_lbls.shape[1] / 2):
+    num_points = int(img_lbls.shape[1] / 2)
+    points = np.zeros(shape=(num_points, 2))
+    for i in range(num_points):
         x = img_lbls[0][i * 2]
         y = img_lbls[0][i * 2 + 1]
-        points.append((y, x))
+        points[i] = np.array([x, y])
 
     return points
 
+def drawlines(img1,img2,lines,pts1,pts2):
+    ''' img1 - image on which we draw the epilines for the points in img2
+        lines - corresponding epilines '''
+    r,c = img1.shape[0:2]
+    # img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
+    # img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
+    for r,pt1,pt2 in zip(lines,pts1.astype(int), pts2.astype(int)):
+        color = tuple(np.random.randint(0,255,3).tolist())
+        x0,y0 = map(int, [0, -r[2]/r[1] ])
+        x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
+        img1 = cv.line(img1, (x0,y0), (x1,y1), color,1)
+        img1 = cv.circle(img1,tuple(pt1),5,color,-1)
+        img2 = cv.circle(img2,tuple(pt2),5,color,-1)
+    return img1, img2
+
 def run_test(dlcpath, shuffle, batch_size, snapshot):
-    # get labeled frame from view 1
-
-    # get labeled frame from view 2
-
     img1_name = "labeled-data/lBack_bodyCrop/img019942.png"
     img1 = cv.imread("/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01/%s" % img1_name)
     img2_name = "labeled-data/lTop_bodyCrop/img019942.png"
@@ -38,7 +51,7 @@ def run_test(dlcpath, shuffle, batch_size, snapshot):
     # plt.show()
     # plt.imshow(img2)
     # plt.show()
-
+    # read the dataframe
     df = pd.read_csv("/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01/training-datasets/iteration-0/UnaugmentedDataSet_bird1Jan1/CollectedData_selmaan.csv")
     print(df.describe())
     col_names = df.loc[df['scorer'] == 'bodyparts']
@@ -48,9 +61,67 @@ def run_test(dlcpath, shuffle, batch_size, snapshot):
     im2_pts = get_img_points(df, img2_name)
 
     # Now you can knock yourself out writing the loss function
+    # compute fundamental matrix
+    # todo: note a minimum of 8 corresponding points are needed
+    F, mask = cv.findFundamentalMat(im1_pts, im2_pts)
+    print(F)
+    # todo: what's going on here?
+    # this selects *only* the inlier points. I think this is unnecessary, because all points are guaranteed to be in
+    # the visible space of the image plane
+    im1_pts = im1_pts[mask.ravel() == 1]
+    im2_pts = im2_pts[mask.ravel() == 1]
+
+    # todo: get lines?
+    # todo: convert to homogeneous
+    ones = np.ones(shape=(im1_pts.shape[0], 1))
+    im1_pts_hom = np.hstack((im1_pts, ones))
+    im2_pts_hom = np.hstack((im2_pts, ones))
+
+    # equivalent to x^Fx
+    z = np.sum(np.dot(im2_pts_hom, F) * im1_pts_hom, axis=1)
+    loss = np.linalg.norm(z, 2)
+    print(z)
+    print(loss)
+
+    # naive x^Fx
+    for i, im1_pt in enumerate(im1_pts_hom):
+        im2_pt = im2_pts_hom[i]
+        z = np.dot(im2_pt.T, np.dot(F, im1_pt))
+        print(z)
+        # z = np.dot(np.dot(im1_pt, F.T), im2_pt.T)
+        # print(z)
+
+    # x(F.T)x^
+    lines1_z = np.zeros(shape=(18,3))
+    for i, x in enumerate(im2_pts_hom):
+        lines1_z[i] = np.dot(F.T, x)
+    a = np.sum(im1_pts_hom * lines1_z, axis=1)
+    print(a)
+
+    lines2_z = np.zeros(shape=(18, 3))
+    for i, x in enumerate(im1_pts_hom):
+        lines2_z[i] = np.dot(F, x)
 
 
     print("here")
+
+    # Find epilines corresponding to points in right image (second image) and
+    # drawing its lines on left image
+    lines1 = cv.computeCorrespondEpilines(im2_pts.reshape(-1, 1, 2), 2, F)
+    lines1 = lines1.reshape(-1, 3)
+    img5, img6 = drawlines(np.copy(img1), np.copy(img2), lines1, im1_pts, im2_pts)
+    # Find epilines corresponding to points in left image (first image) and
+    # drawing its lines on right image
+    lines2 = cv.computeCorrespondEpilines(im1_pts.reshape(-1, 1, 2), 1, F)
+    lines2 = lines2.reshape(-1, 3)
+    img3, img4 = drawlines(np.copy(img2), np.copy(img1), lines2, im2_pts, im1_pts)
+    plt.subplot(121), plt.imshow(img4)
+    plt.subplot(122), plt.imshow(img3)
+    plt.show()
+    plt.subplot(121), plt.imshow(img6)
+    plt.subplot(122), plt.imshow(img5)
+    plt.show()
+
 
     # todo: convert labels to heatmaps (how?)
     # Construct Gaussian targets for all markers
