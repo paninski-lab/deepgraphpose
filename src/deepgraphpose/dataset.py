@@ -15,6 +15,7 @@ from moviepy.editor import VideoFileClip
 from skimage.util import img_as_ubyte
 from tensorflow.python.util import deprecation
 from tqdm import tqdm
+from os.path import isfile, join, split
 
 deprecation._PRINT_DEPRECATION_WARNINGS = False
 
@@ -273,8 +274,12 @@ def coord2map(pdata, joint_loc, nx_out, ny_out, nj):
 def get_frame_idxs_from_train_mat(data_array, video):
     idxs = []
     for dat in data_array:
-        idx = int(dat[0][0].rsplit('/', 1)[-1][3:].split('.')[0])
-        if dat[0][0].find('/' + video + '/') > -1:
+        idx = int(split(dat[0][0])[-1][3:].split('.')[0])
+
+        dat00 = os.path.normpath(dat[0][0])
+        dat00 = dat00.split(os.sep)
+
+        if video in dat00:
             idxs.append(idx)
     return np.sort(idxs)
 
@@ -321,7 +326,7 @@ class Dataset:
         self.nx_out, self.ny_out = self._compute_pred_dims()  # x, y dims of model output
 
         # load manual labels
-        filename = os.path.join(self.dlc_config['project_path'],
+        filename = join(self.dlc_config['project_path'],
                                 self.dlc_config['dataset'])
         data = sio.loadmat(filename)['dataset'][0]
         idxs_train = get_frame_idxs_from_train_mat(data, self.video_name)
@@ -381,7 +386,7 @@ class Dataset:
             find_nan_ind
 
         self.paths['batched_data'] = batches_path
-        video_name = str(self.video_path).split('/')[-1]
+        video_name = split(str(self.video_path))[-1]
         self.batch_key = build_batch_key(**batch_info)
         self.paths['batched_data_hdf5'] = batches_path / str(
             '%s__%s.hdf5' % (video_name.split('.')[0], self.batch_key))
@@ -512,7 +517,7 @@ class Dataset:
     def _find_good_hidden_frames(self, pv_idxs, batch_info):
 
         # see if frames have been previously stored
-        video_name = str(self.video_path).split('/')[-1]
+        video_name = split(str(self.video_path))[-1]
         idxs_file = self.paths['batched_data'] / str(
             '%s__%s_idxs.npy' % (video_name.split('.')[0], self.batch_key))
 
@@ -595,7 +600,7 @@ class Dataset:
         stride = dlc_config['stride']
 
         def extract_frame_num(img_path):
-            return int(img_path.rsplit('/', 1)[-1][3:].split('.')[0])
+            return int(split(img_path)[-1][3:].split('.')[0])
 
         frame_idxs = []
         joinss = []
@@ -615,7 +620,9 @@ class Dataset:
 
             im_path = data[data_keys[5]].im_path
             # skip if frame belongs to another video
-            if im_path.find('/' + self.video_name + '/') == -1:
+            im_path_split = os.path.normpath(im_path).split(os.sep)
+            if self.video_name not in im_path_split:
+            #if im_path.find('/' + self.video_name + '/') == -1:
                 continue
             # skip if image has already been processed
             frame_idx = extract_frame_num(im_path)
@@ -834,7 +841,7 @@ class MultiDataset:
 
         # update video paths from relative to absolute
         self.proj_config['video_sets'] = {
-            os.path.join(self.proj_config['project_path'], key): val
+            join(self.proj_config['project_path'], key): val
             for key, val in self.proj_config['video_sets'].items()
         }
 

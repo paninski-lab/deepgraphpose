@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime as dt
 from pathlib import Path
+from os.path import isfile, join, split
 
 import argparse
 # %%
@@ -140,7 +141,7 @@ def create_labels(task, date, overwrite_flag=False, check_labels=False, verbose=
         yr = data["yr"]
 
         # Extracts the frame number
-        extract_frame_num = lambda x: int(x.split("/")[-1].split(".")[0][3:])
+        extract_frame_num = lambda x: int(split(x)[-1].split(".")[0][3:])
 
         # As this next step is manual, we update the labels by putting them on the diagonal (fixed for all frames)
         for index, bodypart in enumerate(cfg["bodyparts"]):
@@ -150,7 +151,7 @@ def create_labels(task, date, overwrite_flag=False, check_labels=False, verbose=
             )
             #print(columnindex)
             frame_index_name = [
-                os.path.join("labeled-data", data_info.vname, fn) for fn in frames
+                join("labeled-data", data_info.vname, fn) for fn in frames
             ]
             frame_indices = np.asarray(
                 [extract_frame_num(frame_) for frame_ in frame_index_name]
@@ -240,7 +241,7 @@ def create_labels_md(config_path, video_path, scorer, overwrite_flag=False, chec
             xr = data["xr"]
             yr = data["yr"]
             # Extracts the frame number
-            extract_frame_num = lambda x: int(x.split("/")[-1].rsplit(".",1)[0][3:])
+            extract_frame_num = lambda x: int(split(x)[-1].rsplit(".",1)[0][3:])
         
             # As this next step is manual, we update the labels by putting them on the diagonal (fixed for all frames)
             for index, bodypart in enumerate(cfg["bodyparts"]):
@@ -250,7 +251,7 @@ def create_labels_md(config_path, video_path, scorer, overwrite_flag=False, chec
                 )
                 #print(columnindex)
                 frame_index_name = [
-                    os.path.join("labeled-data", vname, fn) for fn in frames
+                    join("labeled-data", vname, fn) for fn in frames
                 ]
                 frame_indices = np.asarray(
                     [extract_frame_num(frame_) for frame_ in frame_index_name]

@@ -11,6 +11,7 @@ from skimage.draw import circle
 from skimage.util import img_as_ubyte
 from tqdm import tqdm
 from pathlib import Path
+from os.path import isfile, join, split
 
 vers = tf.__version__.split('.')
 if int(vers[0]) == 1 and int(vers[1]) > 12:
@@ -242,7 +243,7 @@ def estimate_pose(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle
     from deepgraphpose.utils_model import get_train_config
 
     f = os.path.basename(video_file).rsplit('.', 1)
-    save_file = os.path.join(output_dir, f[0] + '_labeled%s' % save_str)
+    save_file = join(output_dir, f[0] + '_labeled%s' % save_str)
     if os.path.exists(save_file + '.csv'):
         print('labels already exist! video at %s will not be processed' % video_file)
         return save_file + '.csv'
@@ -399,7 +400,7 @@ def estimate_pose0(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffl
     from deepgraphpose.utils_model import get_train_config
 
     f = os.path.basename(video_file).rsplit('.', 1)
-    save_file = os.path.join(output_dir, f[0] + '_labeled%s' % save_str)
+    save_file = join(output_dir, f[0] + '_labeled%s' % save_str)
     if os.path.exists(save_file + '.csv'):
         print('labels already exist! video at %s will not be processed' % video_file)
         return save_file + '.csv'
@@ -566,7 +567,7 @@ def evaluate_dgp(proj_cfg_file, dgp_model_file, shuffle=1, loc_ref=None,
     # deeplabcut.pose_estimation_tensorflow.evaluate.evaluate_network
     trainingsetfolder = auxiliaryfunctions.GetTrainingSetFolder(proj_config)
     DLCscorer = 'DGP'
-    Data = pd.read_hdf(os.path.join(proj_config["project_path"], str(trainingsetfolder),
+    Data = pd.read_hdf(join(proj_config["project_path"], str(trainingsetfolder),
         'CollectedData_' + proj_config["scorer"] + '.h5'), 'df_with_missing')
     # get list of body parts to evaluate network for
     comparisonbodyparts = auxiliaryfunctions.IntersectionofBodyPartsandOnesGivenbyUser(
@@ -577,14 +578,14 @@ def evaluate_dgp(proj_cfg_file, dgp_model_file, shuffle=1, loc_ref=None,
 
     # Load meta data
     data, trainIndices, testIndices, trainFraction = auxiliaryfunctions.LoadMetadata(
-        os.path.join(proj_config['project_path'], metadatafn))
+        join(proj_config['project_path'], metadatafn))
 
     nj = len(dlc_cfg['all_joints_names'])
     Numimages = len(Data.index)
     PredicteData = np.ones((Numimages, 3 * nj))
     print("Analyzing data...")
     for imageindex, imagename in tqdm(enumerate(Data.index)):
-        image = imread(os.path.join(proj_config['project_path'], imagename), mode='RGB')
+        image = imread(join(proj_config['project_path'], imagename), mode='RGB')
 
         if loc_ref:
             if loc_ref_calc.lower() == 'dlc':
@@ -693,10 +694,11 @@ def plot_dgp(video_file, output_dir='', label_dir=None, proj_cfg_file=None,
 
     """
     f = os.path.basename(video_file).rsplit('.', 1)
-    save_file = os.path.join(output_dir, f[0] + '_labeled%s.mp4' % save_str)
+    save_file = join(output_dir, f[0] + '_labeled%s.mp4' % save_str)
+
     if label_dir is None:
         label_dir = output_dir
-    label_file = os.path.join(label_dir, f[0] + '_labeled%s.csv' % save_str)
+    label_file = join(label_dir, f[0] + '_labeled%s.csv' % save_str)
 
     # export labels if necessary
     if not os.path.exists(label_file):

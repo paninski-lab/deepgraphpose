@@ -15,7 +15,7 @@ import logging
 import time
 import os
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, split
 from pathlib import Path
 from random import randint
 
@@ -103,7 +103,8 @@ trainingsetindex=0):
         snapshot = dlc_cfg.net_type.split('_')[0] + '_v1_' + dlc_cfg.net_type.split('_')[1] + '.ckpt'
         init_weights = str(
             parent_path /
-            ('pose_estimation_tensorflow/models/pretrained/' + snapshot))
+            join('pose_estimation_tensorflow', 'models', 'pretrained', snapshot))
+
     dlc_cfg.init_weights = init_weights
     dlc_cfg.pos_dist_thresh = 8
     dlc_cfg.output_stride = 16
@@ -301,7 +302,7 @@ def fit_dgp_labeledonly(
         video_sets = list(cfg['video_sets'])
     else:
         video_sets = [
-            video_path + '/' + f for f in listdir(video_path)
+            join(video_path, f) for f in listdir(video_path)
             if isfile(join(video_path, f)) and (
                     f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find('mkv') > 0)
         ]
@@ -595,7 +596,7 @@ def fit_dgp(
         video_sets = list(cfg['video_sets'])
     else:
         video_sets = [
-            video_path + '/' + f for f in listdir(video_path)
+            join(video_path, f) for f in listdir(video_path)
             if isfile(join(video_path, f)) and (
                     f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find('mkv') > 0)
         ]

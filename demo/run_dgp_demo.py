@@ -8,7 +8,7 @@
 import argparse
 import os
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, split
 from pathlib import Path
 import sys
 import yaml
@@ -31,12 +31,15 @@ def update_config_files(dlcpath):
     base_path = os.getcwd()
 
     # project config
-    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
+    proj_cfg_path = join(base_path, dlcpath, 'config.yaml')
     with open(proj_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
-        video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
-        yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
+        yaml_cfg['project_path'] = join(base_path, dlcpath)
+        video_loc = join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
+        try:
+            yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop(join('videos','reachingvideo1.avi'))
+        except:
+            yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop(video_loc)
     with open(proj_cfg_path, 'w') as f:
         yaml.dump(yaml_cfg, f)
 
@@ -45,7 +48,7 @@ def update_config_files(dlcpath):
     with open(model_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['init_weights'] = get_init_weights_path(base_path)
-        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
+        yaml_cfg['project_path'] = join(base_path, dlcpath)
     with open(model_cfg_path, 'w') as f:
         yaml.dump(yaml_cfg, f)
 
@@ -61,20 +64,20 @@ def update_config_files(dlcpath):
     with open(model_cfg_path, 'w') as f:
         yaml.dump(yaml_cfg, f)
 
-    return os.path.join(base_path, dlcpath)
+    return join(base_path, dlcpath)
 
 
 def return_configs():
     base_path = os.getcwd()
-    dlcpath = 'data/Reaching-Mackenzie-2018-08-30'
+    dlcpath = join('data','Reaching-Mackenzie-2018-08-30')
 
     # project config
-    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
+    proj_cfg_path = join(base_path, dlcpath, 'config.yaml')
     with open(proj_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['project_path'] = dlcpath
-        video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
-        yaml_cfg['video_sets']['videos/reachingvideo1.avi'] = yaml_cfg['video_sets'].pop(video_loc)
+        video_loc = join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
+        yaml_cfg['video_sets'][join('videos','reachingvideo1.avi')] = yaml_cfg['video_sets'].pop(video_loc)
     with open(proj_cfg_path, 'w') as f:
         yaml.dump(yaml_cfg, f)
 
@@ -97,13 +100,13 @@ def return_configs():
 
 
 def get_model_cfg_path(base_path, dtype):
-    return os.path.join(
+    return join(
         base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
         dtype, 'pose_cfg.yaml')
 
 
 def get_init_weights_path(base_path):
-    return os.path.join(
+    return join(
         base_path, 'src', 'DeepLabCut', 'deeplabcut', 'pose_estimation_tensorflow',
         'models', 'pretrained', 'resnet_v1_50.ckpt')
 
@@ -144,7 +147,7 @@ if __name__ == '__main__':
     test = input_params.test
 
     update_configs = False
-    if dlcpath == 'data/Reaching-Mackenzie-2018-08-30':
+    if dlcpath == join('data','Reaching-Mackenzie-2018-08-30'):
         # update config files
         dlcpath = update_config_files(dlcpath)
         update_configs = True
@@ -269,7 +272,7 @@ if __name__ == '__main__':
             video_sets = list(cfg['video_sets'])
         else:
             video_sets = [
-                video_path + '/' + f for f in listdir(video_path)
+                join(video_path, f) for f in listdir(video_path)
                 if isfile(join(video_path, f)) and (
                         f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find(
                     'mkv') > 0)
@@ -284,13 +287,15 @@ if __name__ == '__main__':
         if test:
             for video_file in [video_sets[0]]:
                 from moviepy.editor import VideoFileClip
-                clip =VideoFileClip(str(video_file))
+                clip = VideoFileClip(str(video_file))
                 if clip.duration > 10:
                     clip = clip.subclip(10)
-                video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.',1)[0] + '.mp4'
-                print('\nwriting {}'.format(video_file_name))
-                clip.write_videofile(video_file_name)
-                output_dir = os.getcwd() + '/'
+
+                video_file_tmp = split(video_file)[-1]
+                video_file_name = video_file_tmp.rsplit('.',1)[0] + '.mp4'
+                clip.write_videofile(join(video_pred_path,video_file_name))
+                output_dir = video_pred_path
+                print('\nwriting {} to {}'.format(video_file_name, output_dir))
                 plot_dgp(video_file=str(video_file_name),
                          output_dir=output_dir,
                          proj_cfg_file=str(cfg_yaml),

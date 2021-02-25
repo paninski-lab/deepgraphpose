@@ -4,6 +4,7 @@
 #%autoreload 2
 
 from pathlib import Path
+from os.path import isfile, join, split
 
 import numpy as np
 import pandas as pd
@@ -37,7 +38,7 @@ myclip = VideoFileClip(str(data_info.videofile_path))
 
 #%%
 #filename = mydir / ("train_idx_{}_frame_{}.png".format(tf_idx, frame_idx))
-mydir = Path('/data/libraries/deepgraphpose/tests')
+mydir = Path(join('data','libraries','deepgraphpose','tests'))
 
 #%%
 # read dlc targets
