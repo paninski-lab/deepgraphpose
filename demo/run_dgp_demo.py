@@ -296,7 +296,7 @@ if __name__ == '__main__':
                 clip.write_videofile(join(video_pred_path,video_file_name))
                 output_dir = video_pred_path
                 print('\nwriting {} to {}'.format(video_file_name, output_dir))
-                plot_dgp(video_file=str(video_file_name),
+                plot_dgp(video_file=str(join(video_pred_path,video_file_name)),
                          output_dir=output_dir,
                          proj_cfg_file=str(cfg_yaml),
                          dgp_model_file=str(snapshot_path),
