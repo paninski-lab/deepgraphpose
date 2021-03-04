@@ -3,6 +3,11 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
+
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+from deepgraphpose.models.fitdgp import fit_dgp_labeledonly
 
 vers = tf.__version__.split('.')
 if int(vers[0]) == 1 and int(vers[1]) > 12:
@@ -42,7 +47,7 @@ def drawlines(img1,img2,lines,pts1,pts2):
         img2 = cv.circle(img2,tuple(pt2),5,color,-1)
     return img1, img2
 
-def run_test(dlcpath, shuffle, batch_size, snapshot):
+def run_test_numpy(dlcpath, shuffle, batch_size, snapshot):
     img1_name = "labeled-data/lBack_bodyCrop/img019942.png"
     img1 = cv.imread("/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01/%s" % img1_name)
     img2_name = "labeled-data/lTop_bodyCrop/img019942.png"
@@ -65,20 +70,19 @@ def run_test(dlcpath, shuffle, batch_size, snapshot):
     # todo: note a minimum of 8 corresponding points are needed
     F, mask = cv.findFundamentalMat(im1_pts, im2_pts)
     print(F)
-    # todo: what's going on here?
     # this selects *only* the inlier points. I think this is unnecessary, because all points are guaranteed to be in
     # the visible space of the image plane
     im1_pts = im1_pts[mask.ravel() == 1]
     im2_pts = im2_pts[mask.ravel() == 1]
 
-    # todo: get lines?
-    # todo: convert to homogeneous
+    # convert to homogeneous
     ones = np.ones(shape=(im1_pts.shape[0], 1))
     im1_pts_hom = np.hstack((im1_pts, ones))
     im2_pts_hom = np.hstack((im2_pts, ones))
 
-    # equivalent to x^Fx
+    # compute to x^Fx
     z = np.sum(np.dot(im2_pts_hom, F) * im1_pts_hom, axis=1)
+    # compute loss as magnitude of x^Fx
     loss = np.linalg.norm(z, 2)
     print(z)
     print(loss)
@@ -171,7 +175,52 @@ def run_test(dlcpath, shuffle, batch_size, snapshot):
     #         gm3=gm3)
 
 
+def run_test_tf(dlcpath, shuffle, batch_size, snapshot):
+    img1_name = "labeled-data/lBack_bodyCrop/img019942.png"
+    img1 = cv.imread("/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01/%s" % img1_name)
+    img2_name = "labeled-data/lTop_bodyCrop/img019942.png"
+    img2 = cv.imread("/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01/%s" % img2_name)
+    # plt.imshow(img1)
+    # plt.show()
+    # plt.imshow(img2)
+    # plt.show()
+    # read the dataframe
+    df = pd.read_csv(
+        "/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01/training-datasets/iteration-0/UnaugmentedDataSet_bird1Jan1/CollectedData_selmaan.csv")
+    print(df.describe())
+    col_names = df.loc[df['scorer'] == 'bodyparts']
 
+    # get points (just a helper for this test)
+    im1_pts = get_img_points(df, img1_name)
+    im2_pts = get_img_points(df, img2_name)
+
+
+    # Now you can knock yourself out writing the loss function
+    # compute fundamental matrix
+    # todo: note a minimum of 8 corresponding points are needed
+    F, mask = cv.findFundamentalMat(im1_pts, im2_pts)
+    print(F)
+    # this selects *only* the inlier points. I think this is unnecessary, because all points are guaranteed to be in
+    # the visible space of the image plane
+    im1_pts = im1_pts[mask.ravel() == 1]
+    im2_pts = im2_pts[mask.ravel() == 1]
+
+    # convert to homogeneous
+    ones = np.ones(shape=(im1_pts.shape[0], 1))
+    im1_pts_hom = np.hstack((im1_pts, ones))
+    im2_pts_hom = np.hstack((im2_pts, ones))
+    tf.enable_eager_execution()
+    ###### TF ######
+    im1_pts_hom = tf.convert_to_tensor(im1_pts_hom)
+    im2_pts_hom = tf.convert_to_tensor(im2_pts_hom)
+    F = tf.convert_to_tensor(F)
+
+    # compute to x^Fx
+    z = tf.math.reduce_sum(tf.math.multiply(tf.tensordot(im2_pts_hom, F, axes=1), im1_pts_hom), axis=1)
+    # compute loss as magnitude of x^Fx
+    loss = tf.norm(z, ord=2)
+    print(z)
+    print(loss)
 
 
 if __name__ == '__main__':
@@ -180,4 +229,14 @@ if __name__ == '__main__':
     shuffle = 1
     batch_size = 1
     snapshot = 'snapshot-step0-final--0'
-    run_test(dlcpath, shuffle, batch_size, snapshot)
+    step = 2
+    gm2, gm3 = 1, 3
+    # tf.enable_eager_execution()
+    fit_dgp_labeledonly(snapshot,
+                        dlcpath,
+                        shuffle=shuffle,
+                        step=step,
+                        maxiters=5,
+                        displayiters=1)
+
+    # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
