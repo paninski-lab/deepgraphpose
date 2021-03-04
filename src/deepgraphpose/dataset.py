@@ -11,6 +11,7 @@ import scipy.io as sio
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import yaml
+import cv2 as cv
 from moviepy.editor import VideoFileClip
 from skimage.util import img_as_ubyte
 from tensorflow.python.util import deprecation
@@ -579,6 +580,10 @@ class Dataset:
                                         data=target_2d[i],
                                         dtype='float32')
 
+    @staticmethod
+    def extract_frame_num(img_path):
+        return int(img_path.rsplit('/', 1)[-1][3:].split('.')[0])
+
     def _compute_targets(self):
 
         from deeplabcut.pose_estimation_tensorflow.dataset.factory import \
@@ -594,8 +599,6 @@ class Dataset:
         nj = max([dat_.joints[0].shape[0] for dat_ in dataset.data])
         stride = dlc_config['stride']
 
-        def extract_frame_num(img_path):
-            return int(img_path.rsplit('/', 1)[-1][3:].split('.')[0])
 
         frame_idxs = []
         joinss = []
@@ -618,7 +621,7 @@ class Dataset:
             if im_path.find('/' + self.video_name + '/') == -1:
                 continue
             # skip if image has already been processed
-            frame_idx = extract_frame_num(im_path)
+            frame_idx = self.extract_frame_num(im_path)
             if frame_idx in frame_idxs:
                 continue
 
@@ -816,7 +819,7 @@ class Dataset:
 
 class MultiDataset:
 
-    def __init__(self, config_yaml, video_sets=None, shuffle=None, S0=None):
+    def __init__(self, config_yaml, video_sets=None, shuffle=None, S0=None, multiview=True):
 
         self.datasets = []
         self.paths = {}
@@ -868,6 +871,112 @@ class MultiDataset:
         self.n_frames_total = 0  # labeled + selected hidden + temporal windows
 
         self.curr_batch = 0  # keep track of batches served per schedule
+
+        if multiview:
+            self.compute_fundamental_matrices()
+
+    def compute_fundamental_matrices(self):
+        # create dict of {dataset_name : points_ordered_by_frame_number}, used for computing fundamental matrix F between two views
+        dataset_points_dict = {}
+        for dataset in self.datasets:
+            lbls, idxs, _, _ = dataset._compute_targets()
+            # create dictionary of {idx : [lbls]}
+            idx_lbl_dict = {}
+            for i, idx in enumerate(idxs):
+                idx_lbl_dict[idx] = lbls[i]
+            # create sorted list of indexes from dict
+            sorted_idxs = sorted(idx_lbl_dict.keys())
+            # create ndarray to hold points NOTE: assumes same number of points in each frame
+            num_pts_per_frame = lbls[1].shape[0]
+            num_frames = len(idxs)
+            sorted_points = np.zeros(shape=(num_frames*num_pts_per_frame, 2))
+            for i, idx in enumerate(sorted_idxs): # todo: might break
+                pts = idx_lbl_dict[idx]
+                insertion_idx = i * num_pts_per_frame
+                sorted_points[insertion_idx:insertion_idx+num_pts_per_frame] = pts
+
+            # add sorted points to dict
+            dataset_points_dict[dataset.video_name] = sorted_points
+
+        # make dict of fundamental matrices {video1name_video2name : F}
+        self.fundamental_mat_dict = {}
+        for d1 in self.datasets:
+            for d2 in self.datasets:
+                # only compute F if has not been computed for pair of views
+                key = d1.video_name + "_" + d2.video_name
+                key_reversed = d2.video_name + "_" + d1.video_name
+                if key not in self.fundamental_mat_dict.keys() \
+                        and key_reversed not in self.fundamental_mat_dict.keys()\
+                        and d1.video_name != d2.video_name:
+                    pts1 = dataset_points_dict[d1.video_name]
+                    pts2 = dataset_points_dict[d2.video_name]
+                    # note: a minimum of 8 corresponding points are needed
+                    # todo: gracefully handle breaking case where less than 8 points are provided (SIFT descriptors with FLANN based matcher and ratio test?)
+                    F, mask = cv.findFundamentalMat(pts1, pts2)
+
+                    self.fundamental_mat_dict[key] = F
+
+                    # # the visible space of the image plane
+                    # pts1 = pts1[mask.ravel() == 1]
+                    # pts2 = pts2[mask.ravel() == 1]
+                    #
+                    # # convert to homogeneous
+                    # ones = np.ones(shape=(pts1.shape[0], 1))
+                    # pts1_hom = np.hstack((pts1, ones))
+                    # pts2_hom = np.hstack((pts2, ones))
+                    #
+                    # # compute to x^Fx
+                    # z = np.sum(np.dot(pts2_hom, F) * pts1_hom, axis=1)
+                    # loss = np.linalg.norm(z, 2)
+                    # print(z)
+                    # print(loss)
+
+
+
+        # # create fundamental matrices for each pair of views, this means looping over all datasets twice
+        # for ds1 in self.datasets: # todo: current formulation will naively make 2 F matrices for each matching pair (a,b) and (b,a)
+        #     for ds2 in self.datasets:
+        #         if ds1.video_name != ds2.video_name:
+        #             # # prep for big img point search
+        #             # # Get relevant info from dataset 1
+        #             # data1 = create_dataset(ds1.dlc_config).data
+        #             # # Get relevant info from dataset 2
+        #             # data2 = create_dataset(ds2.dlc_config).data
+        #             # im1_path = data1[0].im_path
+        #             # frame1_num = Dataset.extract_frame_num(im1_path)
+        #             # frame1_pts = data1[0].joints
+        #             # # search for matching frame in dataset 2
+        #             # for d in data2:
+        #             #     frame2_num = Dataset.extract_frame_num(d.im_path)
+        #             #     if frame2_num == frame1_num:
+        #             #         frame2_pts = d.joints
+        #             #         break
+        #             # # todo: gracefully handle breaking case where there is no matching frame in dataset 2
+        #             # todo: consider removing this from the multidataset class
+        #
+        #             # small image corresponding points
+        #             lbls1, idxs1, _, _ = ds1._compute_targets()
+        #             lbls2, idxs2, _, _ = ds2._compute_targets()
+        #
+        #             for i, idx1 in enumerate(idxs1):
+        #                 for j, idx2 in enumerate(idxs2):
+        #                     if idx1 == idx2:
+        #                         frame1_pts = lbls1[i]
+        #                         frame2_pts = lbls2[j]
+        #                         break
+        #                 if idx1 == idx2:
+        #                     break
+        #
+        #             F, mask = cv.findFundamentalMat(frame1_pts, frame2_pts)
+        #             # todo: come up with a better key (maybe). Need to account for doing double work here
+        #             # todo: consider doing a dict{video_name: list([matching_video_names])} like a graph tracking which videos share a computed Fundamental matrix
+        #             key = ds1.video_name + ds2.video_name
+        #             self.fundamental_matrices[key] = F
+
+
+
+
+
 
     def __str__(self):
         """Pretty printing of dataset info"""
@@ -937,6 +1046,8 @@ class MultiDataset:
 
             dataset.global_offset = self.n_frames_total
             self.n_frames_total += len(dataset.idxs['chunk'])
+
+        # todo: maybe need to add fundamental matrices here
 
     def reset(self):
         """Reset iterators so that all data is available."""
