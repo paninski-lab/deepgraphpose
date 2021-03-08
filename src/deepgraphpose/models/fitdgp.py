@@ -306,6 +306,7 @@ def fit_dgp_labeledonly(
             if isfile(join(video_path, f)) and (
                     f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find('mkv') > 0)
         ]
+    print('video_sets: ', video_sets)
 
     # structure info
     bodyparts = cfg['bodyparts']
@@ -477,7 +478,7 @@ def fit_dgp_labeledonly(
         wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg.wt
 
         # data augmentation for visible frames
-        if dgp_cfg.aug and dgp_cfg.wt == 0:
+        if dgp_cfg.aug and dgp_cfg.wt == 0 and len(visible_frame_within_batch) > 0:
             all_data_batch, joint_loc = data_aug(all_data_batch, visible_frame_within_batch, joint_loc, pipeline, dgp_cfg)
 
         locref_targets_batch, locref_mask_batch = coord2map(pdata, joint_loc, nx_out, ny_out, nj)
@@ -600,6 +601,7 @@ def fit_dgp(
             if isfile(join(video_path, f)) and (
                     f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find('mkv') > 0)
         ]
+    print('video_sets: ', video_sets)
 
     # structure info
     bodyparts = cfg['bodyparts']
@@ -773,7 +775,7 @@ def fit_dgp(
         wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg.wt
 
         # data augmentation for visible frames
-        if dgp_cfg.aug and dgp_cfg.wt == 0:
+        if dgp_cfg.aug and dgp_cfg.wt == 0 and len(visible_frame_within_batch) > 0:
             all_data_batch, joint_loc = data_aug(all_data_batch, visible_frame_within_batch, joint_loc, pipeline, dgp_cfg)
 
         locref_targets_batch, locref_mask_batch = coord2map(pdata, joint_loc, nx_out, ny_out, nj)

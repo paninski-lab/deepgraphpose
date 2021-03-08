@@ -330,10 +330,11 @@ class Dataset:
                                 self.dlc_config['dataset'])
         data = sio.loadmat(filename)['dataset'][0]
         idxs_train = get_frame_idxs_from_train_mat(data, self.video_name)
-        print(self.video_name)
-        print(idxs_train)
+        print('### video name: ', self.video_name)
+        print('### idxs_train: ', idxs_train)
         idxs_val = get_frame_idxs_val(dlc_config, idxs_train)
-        assert len(idxs_train) > 0
+        print('### idxs_val: ', idxs_val)
+        #assert len(idxs_train) > 0
         self.idxs = {'vis': {'train': idxs_train, 'val': idxs_val}}
 
         self.curr_batch = 0
@@ -384,7 +385,6 @@ class Dataset:
 
         from deepgraphpose.models.fitdgp_util import find_hidden_markers, find_visible_markers, \
             find_nan_ind
-
         self.paths['batched_data'] = batches_path
         video_name = split(str(self.video_path))[-1]
         self.batch_key = build_batch_key(**batch_info)
@@ -837,7 +837,16 @@ class MultiDataset:
         if video_sets is None:
             self.proj_config['video_path'] = self.proj_config['video_sets']  # backwards compat
         else:
-            self.proj_config['video_path'] = video_sets  # backwards compat
+            video_set_keys = self.proj_config['video_sets'].keys()
+            video_set_keys = [split(v)[-1] for v in video_set_keys]
+            #print('video_set_keys: ', video_set_keys)
+            video_set_input = [split(v)[-1] for v in video_sets]
+            #print('video_set_input: ', video_set_input)
+            if set(video_set_keys)==set(video_set_input):
+                self.proj_config['video_path'] = self.proj_config['video_sets']
+            else:
+                self.proj_config['video_path'] = {v: {} for v in video_sets}  # backwards compat
+                self.proj_config['video_sets'] = {v: {} for v in video_sets}
 
         # update video paths from relative to absolute
         self.proj_config['video_sets'] = {
@@ -860,7 +869,6 @@ class MultiDataset:
             self.datasets.append(Dataset(video_file, self.dlc_config, self.paths))
             self.batch_ratios.append(len(self.datasets[-1].idxs['vis']['train']))
         self.batch_ratios = np.array(self.batch_ratios) / np.sum(self.batch_ratios)
-
         # collect info about datasets
         self.n_datasets = len(self.datasets)
         self.nj = self.datasets[0].nj
