@@ -319,7 +319,7 @@ class Dataset:
         self.nj = self.dlc_config.num_joints
         # to fill upon creating batches
         self.ny_in, self.nx_in = self.video_clip.size
-        self.nx_out, self.ny_out = self._compute_pred_dims()  # x, y dims of model output
+        self.nx_out, self.ny_out = 40, 40 # todo: change back to -> self._compute_pred_dims()  # x, y dims of model output
 
         # load manual labels
         filename = os.path.join(self.dlc_config['project_path'],
@@ -875,6 +875,7 @@ class MultiDataset:
         if multiview:
             self.compute_fundamental_matrices()
 
+    # Creates a dict of {dataset1name_dataset2name : FundamentalMatrix}
     def compute_fundamental_matrices(self):
         # create dict of {dataset_name : points_ordered_by_frame_number}, used for computing fundamental matrix F between two views
         dataset_points_dict = {}
@@ -900,11 +901,12 @@ class MultiDataset:
 
         # make dict of fundamental matrices {video1name_video2name : F}
         self.fundamental_mat_dict = {}
+        self.F_dict_key_delim = "_____"
         for d1 in self.datasets:
             for d2 in self.datasets:
-                # only compute F if has not been computed for pair of views
-                key = d1.video_name + "_" + d2.video_name
-                key_reversed = d2.video_name + "_" + d1.video_name
+                # only compute F if it has not been computed for a pair of views
+                key = d1.video_name + self.F_dict_key_delim + d2.video_name
+                key_reversed = d2.video_name + self.F_dict_key_delim + d1.video_name
                 if key not in self.fundamental_mat_dict.keys() \
                         and key_reversed not in self.fundamental_mat_dict.keys()\
                         and d1.video_name != d2.video_name:
@@ -930,48 +932,6 @@ class MultiDataset:
                     # loss = np.linalg.norm(z, 2)
                     # print(z)
                     # print(loss)
-
-
-
-        # # create fundamental matrices for each pair of views, this means looping over all datasets twice
-        # for ds1 in self.datasets: # todo: current formulation will naively make 2 F matrices for each matching pair (a,b) and (b,a)
-        #     for ds2 in self.datasets:
-        #         if ds1.video_name != ds2.video_name:
-        #             # # prep for big img point search
-        #             # # Get relevant info from dataset 1
-        #             # data1 = create_dataset(ds1.dlc_config).data
-        #             # # Get relevant info from dataset 2
-        #             # data2 = create_dataset(ds2.dlc_config).data
-        #             # im1_path = data1[0].im_path
-        #             # frame1_num = Dataset.extract_frame_num(im1_path)
-        #             # frame1_pts = data1[0].joints
-        #             # # search for matching frame in dataset 2
-        #             # for d in data2:
-        #             #     frame2_num = Dataset.extract_frame_num(d.im_path)
-        #             #     if frame2_num == frame1_num:
-        #             #         frame2_pts = d.joints
-        #             #         break
-        #             # # todo: gracefully handle breaking case where there is no matching frame in dataset 2
-        #             # todo: consider removing this from the multidataset class
-        #
-        #             # small image corresponding points
-        #             lbls1, idxs1, _, _ = ds1._compute_targets()
-        #             lbls2, idxs2, _, _ = ds2._compute_targets()
-        #
-        #             for i, idx1 in enumerate(idxs1):
-        #                 for j, idx2 in enumerate(idxs2):
-        #                     if idx1 == idx2:
-        #                         frame1_pts = lbls1[i]
-        #                         frame2_pts = lbls2[j]
-        #                         break
-        #                 if idx1 == idx2:
-        #                     break
-        #
-        #             F, mask = cv.findFundamentalMat(frame1_pts, frame2_pts)
-        #             # todo: come up with a better key (maybe). Need to account for doing double work here
-        #             # todo: consider doing a dict{video_name: list([matching_video_names])} like a graph tracking which videos share a computed Fundamental matrix
-        #             key = ds1.video_name + ds2.video_name
-        #             self.fundamental_matrices[key] = F
 
 
 
