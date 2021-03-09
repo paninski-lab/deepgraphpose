@@ -451,11 +451,15 @@ def fit_dgp_eager(
         # todo: this loop should be conditional based on how many videos are in the data_batcher?
         # todo: rewrite this to BE a part of the data_batcher?
         all_data_batch_ids = []
+        video_names = []
         for dataset_id in range(len(data_batcher.datasets)):
             (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
              all_marker_batch, addn_batch_info), d = \
                 data_batcher.next_batch(0, dataset_id, visible_frame_batch_i, hidden_frame_batch_i)
+            # add data from a single view to the batch
             all_data_batch_ids.append(all_data_batch)
+            # add the corresponding name of the view to a list of video_names (important that these added at the same time to their respective lists to preserve ordering)
+            video_names.append(data_batcher.datasets[dataset_id].video_name)
 
         # (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
         #  all_marker_batch, addn_batch_info), d = \
@@ -496,8 +500,9 @@ def fit_dgp_eager(
                              np.linspace(0, ny_out - 1, ny_out))
         alpha = np.array([xg, yg]).swapaxes(1, 2)  # 2 x nx_out x ny_out
 
+        all_data_batch_ids = np.concatenate(all_data_batch_ids)
         feed_dict = {
-            'inputs': all_data_batch,
+            'inputs': all_data_batch_ids,
             'targets': joint_loc,
             'locref_map': locref_targets_all_batch,
             'locref_mask': locref_mask_all_batch,
@@ -510,11 +515,25 @@ def fit_dgp_eager(
             'wt_batch_pl': wt_batch,
             'alpha_tf': alpha,
             'learning_rate': current_lr,
+            'video_names': video_names
         }
 
         loss = dgp_loss_eager(data_batcher, dgp_cfg, feed_dict=feed_dict)
 
         start_time00 = time.time()
+
+
+def compute_epipolar_loss(v1_pts, v2_pts, F):
+    # convert to homogeneous coordinates
+    ones = np.ones(shape=(v1_pts.shape[0], 1))
+    im1_pts_hom = np.hstack((v1_pts, ones))
+    im2_pts_hom = np.hstack((v2_pts, ones))
+
+    # compute x`Fx
+    z = tf.math.reduce_sum(tf.math.multiply(tf.tensordot(im2_pts_hom, F, axes=1), im1_pts_hom), axis=1)
+    # compute loss as magnitude of x`Fx
+    epipolar_loss = tf.norm(z, ord=2)
+    return epipolar_loss
 
 
 def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
@@ -555,6 +574,7 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
     nt_batch_pl = feed_dict['nt_batch_pl']
     wt_batch_pl = feed_dict['wt_batch_pl']
     wt_batch_mask_pl = feed_dict['wt_batch_mask_pl']
+    video_names = feed_dict['video_names'] # used in getting the appropiate views for computing epipolar loss
 
     # Build the network
     pn = PoseNet(dgp_cfg) # todo: why is this here? (as opposed to outside of the loss function)
@@ -684,10 +704,23 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
     targets_all_marker_3c = TF.reshape(targets_all_marker, [nt_batch_pl, nj, -1])  # targets_all_marker with 3 columns
 
     F_dict = data_batcher.fundamental_mat_dict
+    num_pts_per_frame = targets_pred.shape[1]
+    num_pts_per_view = num_pts_per_frame * nt_batch_pl
+    loss['epipolar_loss'] = 0
     for key, F in F_dict.items():
         v1_name, v2_name = key.split(data_batcher.F_dict_key_delim)
+        # get coordinates of predictions for video 1
+        name1_idx = video_names.index(v1_name)
+        v1_pts = targets_pred_marker[name1_idx * num_pts_per_view:name1_idx * num_pts_per_view + num_pts_per_view]
+        # get coordinates of predictions for video 2
+        name2_idx = video_names.index(v2_name)
+        v2_pts = targets_pred_marker[name2_idx * num_pts_per_view:name2_idx * num_pts_per_view + num_pts_per_view]
+        # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
+        # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
+        epipolar_loss = compute_epipolar_loss(v1_pts, v2_pts, F)
+        loss['epipolar_loss'] += epipolar_loss
 
-
+    loss['total_loss'] += loss['epipolar_loss']
 
     return loss
 
