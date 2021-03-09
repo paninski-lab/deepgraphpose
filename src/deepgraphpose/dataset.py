@@ -319,7 +319,7 @@ class Dataset:
         self.nj = self.dlc_config.num_joints
         # to fill upon creating batches
         self.ny_in, self.nx_in = self.video_clip.size
-        self.nx_out, self.ny_out = 40, 40 # todo: change back to -> self._compute_pred_dims()  # x, y dims of model output
+        self.nx_out, self.ny_out = self._compute_pred_dims()  # x, y dims of model output
 
         # load manual labels
         filename = os.path.join(self.dlc_config['project_path'],

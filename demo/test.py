@@ -337,6 +337,7 @@ def fit_dgp_eager(
     # initialize data
     # ------------------------------------------------------------------------------------
     # initialize data batcher
+    # todo: self.nx_out, self.ny_out for MultiDataset class need to be specified explicitly when running in eager ((40, 40) for selmaan)
     data_batcher = MultiDataset(config_yaml=config_path,
                                 video_sets=video_sets,
                                 shuffle=shuffle,

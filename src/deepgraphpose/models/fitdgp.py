@@ -377,8 +377,8 @@ def fit_dgp_labeledonly(
 
     # get all selected frame indices
     visible_frame_total = [d.idxs['pv'] for d in data_batcher.datasets]
-    hidden_frame_total = [d.idxs['ph'] for d in data_batcher.datasets]
-    all_frame_total = [d.idxs['chunk'] for d in data_batcher.datasets]
+    # hidden_frame_total = [d.idxs['ph'] for d in data_batcher.datasets]
+    # all_frame_total = [d.idxs['chunk'] for d in data_batcher.datasets]
 
     # %%
     # ------------------------------------------------------------------------------------
@@ -715,7 +715,6 @@ def fit_dgp(
     else:
         sess = TF.Session()
 
-    # todo: gradients computed here?
     # Set up optimizer
     all_train_vars = TF.trainable_variables()
     optimizer = TF.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
@@ -724,7 +723,6 @@ def fit_dgp(
     gradients, _ = TF.clip_by_global_norm(gradients, 10.0)
     train_op = optimizer.apply_gradients(zip(gradients, variables))
 
-    # todo: what is happening here?
     sess.run(TF.global_variables_initializer())
     sess.run(TF.local_variables_initializer())
 
@@ -785,6 +783,8 @@ def fit_dgp(
             all_data_batch_ids.append(all_data_batch)
             # add the corresponding name of the view to a list of video_names (important that these added at the same time to their respective lists to preserve ordering)
             video_names.append(data_batcher.datasets[dataset_id].video_name)
+        # make all_data_batch_ids a single ndarray
+        all_data_batch_ids = np.concatenate(all_data_batch_ids)
 
         nt_batch = len(visible_frame) + len(hidden_frame)
         visible_marker, hidden_marker, visible_marker_in_targets = addn_batch_info
@@ -823,7 +823,7 @@ def fit_dgp(
         alpha = np.array([xg, yg]).swapaxes(1, 2)  # 2 x nx_out x ny_out
 
         feed_dict = {
-            placeholders['inputs']: all_data_batch,
+            placeholders['inputs']: all_data_batch_ids,
             placeholders['targets']: joint_loc,
             placeholders['locref_map']: locref_targets_all_batch,
             placeholders['locref_mask']: locref_mask_all_batch,
@@ -836,6 +836,7 @@ def fit_dgp(
             placeholders['wt_batch_pl']: wt_batch,
             placeholders['alpha_tf']: alpha,
             learning_rate: current_lr,
+            placeholders['video_names']: video_names
         }
 
         start_time00 = time.time()
@@ -955,7 +956,8 @@ def dgp_loss(data_batcher, dgp_cfg):
     ws_max_tf = TF.constant(ws_max,
                             TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
     vector_field_tf = TF.placeholder(TF.float32, shape=[None, None, None])  # placeholder for the vector fields
-    video_names = feed_dict['video_names']  # used in getting the appropiate views for computing epipolar loss
+    # todo: @Sun I'm not sure if this will work
+    video_names = TF.placeholder(TF.string, shape=[None])  # used in getting the appropiate views for computing epipolar loss
 
     # Build the network
     pn = PoseNet(dgp_cfg)
@@ -1087,6 +1089,7 @@ def dgp_loss(data_batcher, dgp_cfg):
     # todo: make this conditional based on whether or not training is "multiview"
     # todo: as it stands right now, I am not incorporating any hard labels, strictly constraining the predictions -> may be helpful to incorporate hard labels
     # todo: consider scaling loss by confidence of prediction
+    # todo: need a weight for the clique?
     F_dict = data_batcher.fundamental_mat_dict
     num_pts_per_frame = targets_pred.shape[1]
     num_pts_per_view = num_pts_per_frame * nt_batch_pl
@@ -1187,6 +1190,7 @@ def dgp_loss(data_batcher, dgp_cfg):
                     'nt_batch_pl': nt_batch_pl,
                     'wt_batch_pl': wt_batch_pl,
                     'alpha_tf': alpha_tf,
+                    'video_names': video_names
                     }
 
     return loss, total_loss, total_loss_visible, placeholders
