@@ -503,6 +503,7 @@ def fit_dgp_eager(
         alpha = np.array([xg, yg]).swapaxes(1, 2)  # 2 x nx_out x ny_out
 
         all_data_batch_ids = np.concatenate(all_data_batch_ids)
+        video_names = tf.convert_to_tensor(video_names)
         feed_dict = {
             'inputs': all_data_batch_ids,
             'targets': joint_loc,
@@ -527,10 +528,12 @@ def fit_dgp_eager(
 
 def compute_epipolar_loss(v1_pts, v2_pts, F):
     # convert to homogeneous coordinates
-    ones = np.ones(shape=(v1_pts.shape[0], 1))
-    im1_pts_hom = np.hstack((v1_pts, ones))
-    im2_pts_hom = np.hstack((v2_pts, ones))
+    ones = tf.ones_like(v1_pts)[:,0]
+    ones = tf.expand_dims(ones, axis=1)
+    im1_pts_hom = tf.concat([v1_pts, ones], axis=1)
+    im2_pts_hom = tf.concat([v2_pts, ones], axis=1)
 
+    F = tf.convert_to_tensor(F, dtype=tf.float32)
     # compute x`Fx
     z = tf.math.reduce_sum(tf.math.multiply(tf.tensordot(im2_pts_hom, F, axes=1), im1_pts_hom), axis=1)
     # compute loss as magnitude of x`Fx
@@ -712,10 +715,10 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
     for key, F in F_dict.items():
         v1_name, v2_name = key.split(data_batcher.F_dict_key_delim)
         # get coordinates of predictions for video 1
-        name1_idx = video_names.index(v1_name)
+        name1_idx = tf.where(tf.equal(video_names, v1_name))[0][0]
         v1_pts = targets_pred_marker[name1_idx * num_pts_per_view:name1_idx * num_pts_per_view + num_pts_per_view]
         # get coordinates of predictions for video 2
-        name2_idx = video_names.index(v2_name)
+        name2_idx = tf.where(tf.equal(video_names, v2_name))[0][0]
         v2_pts = targets_pred_marker[name2_idx * num_pts_per_view:name2_idx * num_pts_per_view + num_pts_per_view]
         # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
         # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)

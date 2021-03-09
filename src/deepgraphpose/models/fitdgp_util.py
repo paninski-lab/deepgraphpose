@@ -252,6 +252,8 @@ def combine_all_marker(targets_pred_hidden_marker, targets_visible_marker, hidde
     scatter1 = TF.scatter_nd(indices, targets_visible_marker[:, 1], shape)
     scatter_yv = TF.transpose(TF.stack([scatter0, scatter1]))
 
+    scatter_mu = tf.dtypes.cast(scatter_mu, tf.float32)
+    scatter_yv = tf.dtypes.cast(scatter_yv, tf.float32)
     targets_all_marker = scatter_mu + scatter_yv
 
     return targets_all_marker

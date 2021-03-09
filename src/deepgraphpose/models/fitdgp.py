@@ -112,7 +112,7 @@ trainingsetindex=0):
     model_name = dlc_cfg.snapshot_prefix + '-step0-final--0.index'
     if os.path.isfile(model_name):
         print(model_name, '  exists! The original DLC has already been run.', flush=True)
-        return None
+        # return None
 
     # Build loss function
     TF.reset_default_graph()
@@ -360,7 +360,7 @@ def fit_dgp_labeledonly(
     model_name = dgp_cfg.snapshot_prefix + '-step1-final--0.index'
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP with labeled frames has already been run.', flush=True)
-        return None
+        # return None
 
     # create training data - find good hidden frames
     snapshot = 0
@@ -668,7 +668,7 @@ def fit_dgp(
     model_name = dgp_cfg.snapshot_prefix + '-step{}{}-final--0.index'.format(step, debug)
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP has already been run.', flush=True)
-        return None
+        # return None
 
     # create training data - find good hidden frames
     snapshot = 0
@@ -1092,15 +1092,15 @@ def dgp_loss(data_batcher, dgp_cfg):
     # todo: need a weight for the clique?
     F_dict = data_batcher.fundamental_mat_dict
     num_pts_per_frame = targets_pred.shape[1]
-    num_pts_per_view = num_pts_per_frame * nt_batch_pl
+    num_pts_per_view = tf.dtypes.cast(num_pts_per_frame * nt_batch_pl, tf.int64) # need to cast this as an int64 for some reason or it breaks
     loss['epipolar_loss'] = 0
     for key, F in F_dict.items():
         v1_name, v2_name = key.split(data_batcher.F_dict_key_delim)
         # get coordinates of predictions for video 1
-        name1_idx = video_names.index(v1_name)
+        name1_idx = tf.where(tf.equal(video_names, v1_name))[0][0]
         v1_pts = targets_pred_marker[name1_idx * num_pts_per_view:name1_idx * num_pts_per_view + num_pts_per_view]
         # get coordinates of predictions for video 2
-        name2_idx = video_names.index(v2_name)
+        name2_idx = tf.where(tf.equal(video_names, v2_name))[0][0]
         v2_pts = targets_pred_marker[name2_idx * num_pts_per_view:name2_idx * num_pts_per_view + num_pts_per_view]
         # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
         # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
@@ -1198,10 +1198,12 @@ def dgp_loss(data_batcher, dgp_cfg):
 
 def compute_epipolar_loss(v1_pts, v2_pts, F):
     # convert to homogeneous coordinates
-    ones = np.ones(shape=(v1_pts.shape[0], 1))
-    im1_pts_hom = np.hstack((v1_pts, ones))
-    im2_pts_hom = np.hstack((v2_pts, ones))
+    ones = tf.ones_like(v1_pts)[:,0]
+    ones = tf.expand_dims(ones, axis=1)
+    im1_pts_hom = tf.concat([v1_pts, ones], axis=1)
+    im2_pts_hom = tf.concat([v2_pts, ones], axis=1)
 
+    F = tf.convert_to_tensor(F, dtype=tf.float32)
     # compute x`Fx
     z = tf.math.reduce_sum(tf.math.multiply(tf.tensordot(im2_pts_hom, F, axes=1), im1_pts_hom), axis=1)
     # compute loss as magnitude of x`Fx
