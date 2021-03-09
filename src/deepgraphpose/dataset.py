@@ -1007,7 +1007,6 @@ class MultiDataset:
             dataset.global_offset = self.n_frames_total
             self.n_frames_total += len(dataset.idxs['chunk'])
 
-        # todo: maybe need to add fundamental matrices here
 
     def reset(self):
         """Reset iterators so that all data is available."""

@@ -377,8 +377,8 @@ def fit_dgp_labeledonly(
 
     # get all selected frame indices
     visible_frame_total = [d.idxs['pv'] for d in data_batcher.datasets]
-    # hidden_frame_total = [d.idxs['ph'] for d in data_batcher.datasets]
-    # all_frame_total = [d.idxs['chunk'] for d in data_batcher.datasets]
+    hidden_frame_total = [d.idxs['ph'] for d in data_batcher.datasets]
+    all_frame_total = [d.idxs['chunk'] for d in data_batcher.datasets]
 
     # %%
     # ------------------------------------------------------------------------------------
@@ -460,9 +460,23 @@ def fit_dgp_labeledonly(
         visible_frame_batch_i = np.array([visible_batch_ind[1]])
         hidden_frame_batch_i = np.array([])
 
-        (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
-         all_marker_batch, addn_batch_info), d = \
-            data_batcher.next_batch(0, dataset_i, visible_frame_batch_i, hidden_frame_batch_i)
+        # TODO: this is where the multiview dataloader was switched in (commented code is original)
+        # (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
+        #  all_marker_batch, addn_batch_info), d = \
+        #     data_batcher.next_batch(0, dataset_i, visible_frame_batch_i, hidden_frame_batch_i)
+        # todo: this loop should be conditional based on how many videos are in the data_batcher?
+        # todo: rewrite this to BE a part of the data_batcher?
+        all_data_batch_ids = []
+        video_names = []
+        for dataset_id in range(len(data_batcher.datasets)):
+            (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
+             all_marker_batch, addn_batch_info), d = \
+                data_batcher.next_batch(0, dataset_id, visible_frame_batch_i, hidden_frame_batch_i)
+            # add data from a single view to the batch
+            all_data_batch_ids.append(all_data_batch)
+            # add the corresponding name of the view to a list of video_names (important that these added at the same time to their respective lists to preserve ordering)
+            video_names.append(data_batcher.datasets[dataset_id].video_name)
+
         nt_batch = len(visible_frame) + len(hidden_frame)
         visible_marker, hidden_marker, visible_marker_in_targets = addn_batch_info
         all_frame = np.sort(list(visible_frame) + list(hidden_frame))
@@ -678,9 +692,7 @@ def fit_dgp(
     # ------------------------------------------------------------------------------------
     # Build model
     # ------------------------------------------------------------------------------------
-    # todo: what does this line mean?
     TF.reset_default_graph()
-    # todo: loss computed here?
     loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg)
     learning_rate = TF.placeholder(tf.float32, shape=[])
 
@@ -764,15 +776,16 @@ def fit_dgp(
         # todo: this loop should be conditional based on how many videos are in the data_batcher?
         # todo: rewrite this to BE a part of the data_batcher?
         all_data_batch_ids = []
+        video_names = []
         for dataset_id in range(len(data_batcher.datasets)):
             (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
-              all_marker_batch, addn_batch_info), d = \
-                 data_batcher.next_batch(0, dataset_i, visible_frame_batch_i, hidden_frame_batch_i)
+             all_marker_batch, addn_batch_info), d = \
+                data_batcher.next_batch(0, dataset_id, visible_frame_batch_i, hidden_frame_batch_i)
+            # add data from a single view to the batch
             all_data_batch_ids.append(all_data_batch)
+            # add the corresponding name of the view to a list of video_names (important that these added at the same time to their respective lists to preserve ordering)
+            video_names.append(data_batcher.datasets[dataset_id].video_name)
 
-        # (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
-        #  all_marker_batch, addn_batch_info), d = \
-        #     data_batcher.next_batch(0, dataset_i, visible_frame_batch_i, hidden_frame_batch_i)
         nt_batch = len(visible_frame) + len(hidden_frame)
         visible_marker, hidden_marker, visible_marker_in_targets = addn_batch_info
         all_frame = np.sort(list(visible_frame) + list(hidden_frame))
@@ -780,7 +793,7 @@ def fit_dgp(
 
         # batch data for placeholders
         if dgp_cfg.wt > 0:
-            vector_field = learn_wt(all_data_batch)  # vector field from optical flow # todo: optical flow?
+            vector_field = learn_wt(all_data_batch)  # vector field from optical flow
         else:
             vector_field = np.zeros((1,1,1))
         wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg.wt
@@ -942,6 +955,7 @@ def dgp_loss(data_batcher, dgp_cfg):
     ws_max_tf = TF.constant(ws_max,
                             TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
     vector_field_tf = TF.placeholder(TF.float32, shape=[None, None, None])  # placeholder for the vector fields
+    video_names = feed_dict['video_names']  # used in getting the appropiate views for computing epipolar loss
 
     # Build the network
     pn = PoseNet(dgp_cfg)
@@ -986,7 +1000,7 @@ def dgp_loss(data_batcher, dgp_cfg):
     targets_gauss = targets_gauss / gauss_max
     targets_gauss = TF.transpose(TF.reshape(targets_gauss, [-1, nj, nx_out, ny_out]), [0, 2, 3, 1])
 
-    # Now calculate the cross entropy given the network outputs and the Gaussian targets # todo: cross entropy computed here?
+    # Now calculate the cross entropy given the network outputs and the Gaussian targets
     n_hidden_frames_batch = TF.cast(TF.shape(hidden_marker_pl)[0], tf.float32)  # number of hidden markers in the batch
     n_visible_frames_batch = TF.cast(TF.shape(visible_marker_pl)[0],
                                      tf.float32)  # number of hidden markers in the batch
@@ -1069,6 +1083,29 @@ def dgp_loss(data_batcher, dgp_cfg):
     # Cliques
     # ------------------------------------------------------------------------------------
     targets_all_marker_3c = TF.reshape(targets_all_marker, [nt_batch_pl, nj, -1])  # targets_all_marker with 3 columns
+    # Epipolar clique
+    # todo: make this conditional based on whether or not training is "multiview"
+    # todo: as it stands right now, I am not incorporating any hard labels, strictly constraining the predictions -> may be helpful to incorporate hard labels
+    # todo: consider scaling loss by confidence of prediction
+    F_dict = data_batcher.fundamental_mat_dict
+    num_pts_per_frame = targets_pred.shape[1]
+    num_pts_per_view = num_pts_per_frame * nt_batch_pl
+    loss['epipolar_loss'] = 0
+    for key, F in F_dict.items():
+        v1_name, v2_name = key.split(data_batcher.F_dict_key_delim)
+        # get coordinates of predictions for video 1
+        name1_idx = video_names.index(v1_name)
+        v1_pts = targets_pred_marker[name1_idx * num_pts_per_view:name1_idx * num_pts_per_view + num_pts_per_view]
+        # get coordinates of predictions for video 2
+        name2_idx = video_names.index(v2_name)
+        v2_pts = targets_pred_marker[name2_idx * num_pts_per_view:name2_idx * num_pts_per_view + num_pts_per_view]
+        # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
+        # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
+        epipolar_loss = compute_epipolar_loss(v1_pts, v2_pts, F)
+        loss['epipolar_loss'] += epipolar_loss
+
+    total_loss += loss['epipolar_loss']
+
 
     # Spatial clique
     if nl > 0:
@@ -1134,19 +1171,6 @@ def dgp_loss(data_batcher, dgp_cfg):
                 n_visible_frames_total + n_hidden_frames_total) / wn_visible_tf
         total_loss += loss['wt_loss']
 
-    # Epipolar loss
-    # IF multiple views are provided
-    # make pairs of views
-    # for each pair of views:
-        # Compute F (fundamental matrix) for the views
-        # for each pair of points in view: # todo: obviously this will be vectorized -- not in loop form
-            # loss = ||x1F|| + ||Fx2||
-
-    # todo: not gonna lie, I don't fully understand how this method works, it seems to be called outside of training
-    #       How does this function know anything about the actual datapoints it's dealing with, let alone the predictions
-    #       from the model needed to compute the loss.
-
-
     loss['total_loss'] = total_loss
 
     total_loss_visible = loss['visible_loss_pred'] + loss['visible_loss_locref']
@@ -1166,3 +1190,16 @@ def dgp_loss(data_batcher, dgp_cfg):
                     }
 
     return loss, total_loss, total_loss_visible, placeholders
+
+
+def compute_epipolar_loss(v1_pts, v2_pts, F):
+    # convert to homogeneous coordinates
+    ones = np.ones(shape=(v1_pts.shape[0], 1))
+    im1_pts_hom = np.hstack((v1_pts, ones))
+    im2_pts_hom = np.hstack((v2_pts, ones))
+
+    # compute x`Fx
+    z = tf.math.reduce_sum(tf.math.multiply(tf.tensordot(im2_pts_hom, F, axes=1), im1_pts_hom), axis=1)
+    # compute loss as magnitude of x`Fx
+    epipolar_loss = tf.norm(z, ord=2)
+    return epipolar_loss

@@ -36,6 +36,7 @@ from deepgraphpose.models.fitdgp_util import gen_batch, argmax_2d_from_cm, combi
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 from deepgraphpose.models.fitdgp import fit_dgp_labeledonly
+from deepgraphpose.models.fitdgp import fit_dgp
 
 vers = tf.__version__.split('.')
 if int(vers[0]) == 1 and int(vers[1]) > 12:
@@ -737,7 +738,7 @@ if __name__ == '__main__':
 
 
     # tf.enable_eager_execution()
-    fit_dgp_eager(snapshot,
+    fit_dgp(snapshot,
                         dlcpath,
                         shuffle=shuffle,
                         step=step,
