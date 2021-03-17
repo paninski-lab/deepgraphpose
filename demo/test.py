@@ -738,17 +738,7 @@ if __name__ == '__main__':
     step = 2
     gm2, gm3 = 1, 3
 
-
-
-
     # tf.enable_eager_execution()
-    fit_dgp(snapshot,
-                        dlcpath,
-                        shuffle=shuffle,
-                        step=step,
-                        maxiters=5,
-                        displayiters=1)
-
-
+    fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step)
 
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)

@@ -20,6 +20,7 @@ from pathlib import Path
 from random import randint
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
@@ -748,6 +749,12 @@ def fit_dgp(
         pipeline = build_aug(apply_prob=0.8)
 
     time_start = time.time()
+    epipolar_losses = []
+    vis_losses = []
+    hid_losses = []
+    vis_loss_locref = []
+    ws_losses = []
+    total_losses = []
     for it in range(maxiters):
 
         current_lr = dgp_cfg.lr
@@ -852,6 +859,14 @@ def fit_dgp(
             print('\n running time: ', end_time00 - start_time00, flush=True)
             print('\n loss: ', loss_eval, flush=True)
 
+        # save the distinct losses
+        epipolar_losses.append(loss_eval['epipolar_loss'])
+        vis_losses.append(loss_eval['visible_loss_pred'])
+        hid_losses.append(loss_eval['hidden_loss_pred'])
+        vis_loss_locref.append(loss_eval['visible_loss_locref'])
+        ws_losses.append(loss_eval['ws_loss'])
+        total_losses.append(loss_eval['total_loss'])
+
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
             model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug)+ '-'
@@ -862,6 +877,13 @@ def fit_dgp(
                 model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug) +'-final-'
                 #print('Storing model {}'.format(model_name))
                 saver.save(sess, model_name, global_step=0)
+
+    # write the losses to a csv file for further analysis
+    write_losses_to_csv(
+        [epipolar_losses, vis_losses, hid_losses, vis_loss_locref, ws_losses, total_losses],
+        ["epipolar loss", "visible loss", "hidden loss", "visible loss locref", "ws loss", "total loss"],
+        "./losses.csv"
+    )
 
     time_end = time.time()
     print('Finished {} iterations\n'.format(it), flush=True)
@@ -1088,7 +1110,7 @@ def dgp_loss(data_batcher, dgp_cfg):
     # Epipolar clique
     # todo: make this conditional based on whether or not training is "multiview"
     # todo: as it stands right now, I am not incorporating any hard labels, strictly constraining the predictions -> may be helpful to incorporate hard labels
-    # todo: consider scaling loss by confidence of prediction
+    # todo: consider scaling loss by confidence of prediction?
     # todo: need a weight for the clique?
     F_dict = data_batcher.fundamental_mat_dict
     num_pts_per_frame = targets_pred.shape[1]
@@ -1209,3 +1231,26 @@ def compute_epipolar_loss(v1_pts, v2_pts, F):
     # compute loss as magnitude of x`Fx
     epipolar_loss = tf.norm(z, ord=2)
     return epipolar_loss
+
+
+def write_losses_to_csv(all_losses_list, loss_names, path):
+    """ Saves all losses to a csv where each row represents an iteration
+    Parameters
+    ----------
+    all_losses_list : a tuple containing each of the lists of distinct losses tracked
+    loss_names : a list containing the names of each of the distinct losses
+    path : where to save the csv
+
+    Returns
+    -------
+    None
+    """
+    # convert list to df of shape=(num_iters, num_distinct_losses)
+    all_losses_df = pd.DataFrame(np.array(all_losses_list).T)
+    # add column names
+    all_losses_df.columns = loss_names
+
+    # save losses to csv
+    all_losses_df.to_csv(path)
+
+
