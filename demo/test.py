@@ -731,7 +731,8 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
 
 if __name__ == '__main__':
     # print(tf.__version__)
-    dlcpath = "/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01"
+    # dlcpath = "/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01" # personal machine path
+    dlcpath = "/home/sd3470/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # axon path
     shuffle = 1
     batch_size = 1
     snapshot = 'snapshot-step0-final--0'
