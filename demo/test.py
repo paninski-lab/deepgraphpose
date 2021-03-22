@@ -700,7 +700,7 @@ else:
 if __name__ == '__main__':
     # dlcpath = "/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01" # personal machine path
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
-    dlcpath = base_path + "deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # axon path
+    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # axon path
     shuffle = 1
     batch_size = 1
     snapshot = 'snapshot-step0-final--0'
