@@ -894,7 +894,7 @@ def fit_dgp(
     return None
 
 
-def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
+def dgp_loss(data_batcher, dgp_cfg, placeholders):
     """Construct the loss for DGP.
     Parameters
     ----------
@@ -940,21 +940,21 @@ def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
     ws = 1 / (np.nan_to_num(
         limb_full) + 1e-20) * dgp_cfg.ws  # spatial clique parameter based on the limb length and dlc_cfg.ws
 
-    # feed_dict
-    inputs = placeholder_dict['inputs']
-    targets = placeholder_dict['targets']
+    # placeholders
+    inputs = placeholders['inputs']
+    targets = placeholders['targets']
     targets_nonan = TF.where(TF.is_nan(targets), TF.ones_like(targets) * 0, targets)  # set nan to be 0 in targets
-    locref_map = placeholder_dict['locref_map']
-    locref_mask = placeholder_dict['locref_mask']
-    visible_marker_pl = placeholder_dict['visible_marker_pl']
-    hidden_marker_pl = placeholder_dict['hidden_marker_pl']
-    visible_marker_in_targets_pl = placeholder_dict['visible_marker_in_targets_pl']
-    nt_batch_pl = placeholder_dict['nt_batch_pl']
-    wt_batch_pl = placeholder_dict['wt_batch_pl']
-    wt_batch_mask_pl = placeholder_dict['wt_batch_mask_pl']
-    video_names = placeholder_dict['video_names']  # used in getting the appropiate views for computing epipolar loss
-    alpha_tf = placeholder_dict['alpha_tf']
-    vector_field_tf = placeholder_dict['vector_field_tf']
+    locref_map = placeholders['locref_map']
+    locref_mask = placeholders['locref_mask']
+    visible_marker_pl = placeholders['visible_marker_pl']
+    hidden_marker_pl = placeholders['hidden_marker_pl']
+    visible_marker_in_targets_pl = placeholders['visible_marker_in_targets_pl']
+    nt_batch_pl = placeholders['nt_batch_pl']
+    wt_batch_pl = placeholders['wt_batch_pl']
+    wt_batch_mask_pl = placeholders['wt_batch_mask_pl']
+    video_names = placeholders['video_names']  # used in getting the appropiate views for computing epipolar loss
+    alpha_tf = placeholders['alpha_tf']
+    vector_field_tf = placeholders['vector_field_tf']
 
     wt_batch_tf = TF.multiply(wt_batch_pl, wt_batch_mask_pl)  # wt vector for the batch
     wt_max_tf = TF.constant(dgp_cfg.wt_max, TF.float32)  # placeholder for the upper bounds for the temporal clique wt
