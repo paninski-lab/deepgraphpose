@@ -386,7 +386,8 @@ def fit_dgp_labeledonly(
     # Build model
     # ------------------------------------------------------------------------------------
     TF.reset_default_graph()
-    loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg, define_placeholders(data_batcher.nj))
+    placeholders = define_placeholders(data_batcher.nj)
+    loss, total_loss, total_loss_visible = dgp_loss(data_batcher, dgp_cfg, placeholders)
     learning_rate = TF.placeholder(tf.float32, shape=[])
 
     # Restore network parameters for RESNET and COVNET
@@ -694,7 +695,8 @@ def fit_dgp(
     # Build model
     # ------------------------------------------------------------------------------------
     TF.reset_default_graph()
-    loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg, define_placeholders(data_batcher.nj))
+    placeholders = define_placeholders(data_batcher.nj)
+    loss, total_loss, total_loss_visible = dgp_loss(data_batcher, dgp_cfg, placeholders)
     learning_rate = TF.placeholder(tf.float32, shape=[])
 
     # Restore network parameters for RESNET and COVNET
@@ -952,6 +954,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
     wt_batch_mask_pl = placeholder_dict['wt_batch_mask_pl']
     video_names = placeholder_dict['video_names']  # used in getting the appropiate views for computing epipolar loss
     alpha_tf = placeholder_dict['alpha_tf']
+    vector_field_tf = placeholder_dict['vector_field_tf']
 
     wt_batch_tf = TF.multiply(wt_batch_pl, wt_batch_mask_pl)  # wt vector for the batch
     wt_max_tf = TF.constant(dgp_cfg.wt_max, TF.float32)  # placeholder for the upper bounds for the temporal clique wt
@@ -964,7 +967,6 @@ def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
     ws_tf = TF.constant(ws, TF.float32)  # placeholder for the spatial clique ws; it varies across joints
     ws_max_tf = TF.constant(ws_max,
                             TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
-    vector_field_tf = TF.placeholder(TF.float32, shape=[None, None, None])  # placeholder for the vector fields
 
     # Build the network
     pn = PoseNet(dgp_cfg)
@@ -991,11 +993,15 @@ def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
                                        visible_marker_in_targets_pl)  # 2d locations for visible markers, observed targets
 
     # Combine visible markers and hidden markers to construct a full vector for all frames and all markers
+    # set hidden_marker_pl and visible_marker_pl to int32 (instead of int64) for some reason
+    hidden_marker_pl = hidden_marker_pl.astype('int32')
+    visible_marker_pl = visible_marker_pl.astype('int32')
     targets_all_marker = combine_all_marker(targets_pred_hidden_marker, targets_visible_marker, hidden_marker_pl,
                                             visible_marker_pl, nj, nt_batch_pl)
 
     # Construct Gaussian targets for all markers
     target_expand = TF.expand_dims(TF.expand_dims(targets_all_marker, 2), 3)  # (nt*nj) x 2 x 1 x 1
+    target_expand = tf.dtypes.cast(target_expand, tf.float64)
 
     # 2d grid of the output
     alpha_expand = TF.expand_dims(alpha_tf, 0)  # 1 x 2 x nx_out x ny_out
@@ -1003,7 +1009,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
     # normalize the Gaussian bump for the target so that the peak is 1, nt * nx_out * ny_out * nj
     targets_gauss = TF.exp(-TF.reduce_sum(TF.square(alpha_expand - target_expand), axis=1) /
                            (2 * (dgp_cfg.lengthscale ** 2)))
-    gauss_max = TF.reduce_max(TF.reduce_max(targets_gauss, [1]), [1]) + TF.constant(1e-5, TF.float32)
+    gauss_max = TF.reduce_max(TF.reduce_max(targets_gauss, [1]), [1]) + TF.constant(1e-5, TF.float64)
     gauss_max = TF.expand_dims(TF.expand_dims(gauss_max, [1]), [2])
     targets_gauss = targets_gauss / gauss_max
     targets_gauss = TF.transpose(TF.reshape(targets_gauss, [-1, nj, nx_out, ny_out]), [0, 2, 3, 1])
@@ -1184,22 +1190,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
 
     total_loss_visible = loss['visible_loss_pred'] + loss['visible_loss_locref']
 
-    placeholders = {'inputs': inputs,
-                    'targets': targets,
-                    'locref_map': locref_map,
-                    'locref_mask': locref_mask,
-                    'visible_marker_pl': visible_marker_pl,
-                    'hidden_marker_pl': hidden_marker_pl,
-                    'visible_marker_in_targets_pl': visible_marker_in_targets_pl,
-                    'wt_batch_mask_pl': wt_batch_mask_pl,
-                    'vector_field_tf': vector_field_tf,
-                    'nt_batch_pl': nt_batch_pl,
-                    'wt_batch_pl': wt_batch_pl,
-                    'alpha_tf': alpha_tf,
-                    'video_names': video_names
-                    }
-
-    return loss, total_loss, total_loss_visible, placeholders
+    return loss, total_loss, total_loss_visible
 
 
 # todo: write docstring
@@ -1226,23 +1217,25 @@ def define_placeholders(nj):
     video_names = TF.placeholder(TF.string,
                                  shape=[None])  # used in getting the appropiate views for computing epipolar loss
     alpha_tf = TF.placeholder(tf.float32, shape=[2, None, None], name="2dgrid")
+    vector_field_tf = TF.placeholder(TF.float32, shape=[None, None, None])  # placeholder for the vector fields
 
-    # placeholder_dict
-    placeholder_dict = {}
-    placeholder_dict['inputs'] = inputs
-    placeholder_dict['targets'] = targets
-    placeholder_dict['locref_map'] = locref_map
-    placeholder_dict['locref_mask'] = locref_mask
-    placeholder_dict['visible_marker_pl'] = visible_marker_pl
-    placeholder_dict['hidden_marker_pl'] = hidden_marker_pl
-    placeholder_dict['visible_marker_in_targets_pl'] = visible_marker_in_targets_pl
-    placeholder_dict['nt_batch_pl'] = nt_batch_pl
-    placeholder_dict['wt_batch_pl'] = wt_batch_pl
-    placeholder_dict['wt_batch_mask_pl'] = wt_batch_mask_pl
-    placeholder_dict['video_names'] = video_names
-    placeholder_dict['alpha_tf'] = alpha_tf
+    placeholders = {
+        'inputs': inputs,
+        'targets': targets,
+        'locref_map': locref_map,
+        'locref_mask': locref_mask,
+        'visible_marker_pl': visible_marker_pl,
+        'hidden_marker_pl': hidden_marker_pl,
+        'visible_marker_in_targets_pl': visible_marker_in_targets_pl,
+        'wt_batch_mask_pl': wt_batch_mask_pl,
+        'vector_field_tf': vector_field_tf,
+        'nt_batch_pl': nt_batch_pl,
+        'wt_batch_pl': wt_batch_pl,
+        'alpha_tf': alpha_tf,
+        'video_names': video_names
+    }
 
-    return placeholder_dict
+    return placeholders
 
 
 # todo: write docstring

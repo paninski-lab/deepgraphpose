@@ -6,6 +6,8 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 from deepgraphpose.models.fitdgp import fit_dgp
 from deepgraphpose.models.fitdgp import compute_epipolar_loss
+from deepgraphpose.models.fitdgp import dgp_loss
+from deepgraphpose.models.fitdgp import define_placeholders
 
 import importlib
 import logging
@@ -520,7 +522,7 @@ def fit_dgp_eager(
             'video_names': video_names
         }
 
-        loss = dgp_loss_eager(data_batcher, dgp_cfg, feed_dict=feed_dict)
+        loss = dgp_loss(data_batcher, dgp_cfg, placeholder_dict=feed_dict)
 
         start_time00 = time.time()
 #
