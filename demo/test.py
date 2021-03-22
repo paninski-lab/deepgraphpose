@@ -927,6 +927,6 @@ if __name__ == '__main__':
     #
     # # tf.enable_eager_execution()
     print(dlcpath)
-    fit_dgp_eager(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size)
+    fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size)
 
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
