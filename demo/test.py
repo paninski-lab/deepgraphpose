@@ -724,7 +724,7 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
         epipolar_loss = compute_epipolar_loss(v1_pts, v2_pts, F)
         loss['epipolar_loss'] += epipolar_loss
 
-    loss['total_loss'] += loss['epipolar_loss']
+    total_loss += loss['epipolar_loss']
 
     return loss
 
