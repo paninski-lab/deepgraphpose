@@ -579,6 +579,8 @@ def fit_dgp_eager(
         print(epipolar_loss)
         # total_loss += loss['epipolar_loss']
 
+        tf.reset_default_graph()
+
 
         start_time00 = time.time()
 #
