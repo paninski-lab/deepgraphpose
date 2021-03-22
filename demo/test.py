@@ -920,7 +920,7 @@ if __name__ == '__main__':
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
     dlcpath = base_path + "/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # axon path
     shuffle = 1
-    batch_size = 1
+    batch_size = 15
     snapshot = 'snapshot-step0-final--0'
     step = 2
     # gm2, gm3 = 1, 3
