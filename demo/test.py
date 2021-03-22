@@ -576,7 +576,7 @@ def fit_dgp_eager(
             # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
             epipolar_loss = 0.1 * compute_epipolar_loss(v1_pts, v2_pts, F)
             # loss['epipolar_loss'] += epipolar_loss
-        print(all_frame_batch + " " + epipolar_loss)
+        print(all_frame_batch, epipolar_loss)
         # total_loss += loss['epipolar_loss']
 
         tf.reset_default_graph()
