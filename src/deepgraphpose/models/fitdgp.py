@@ -1001,7 +1001,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
 
     # Construct Gaussian targets for all markers
     target_expand = TF.expand_dims(TF.expand_dims(targets_all_marker, 2), 3)  # (nt*nj) x 2 x 1 x 1
-    target_expand = tf.dtypes.cast(target_expand, tf.float64)
+    # target_expand = tf.dtypes.cast(target_expand, tf.float64)
 
     # 2d grid of the output
     alpha_expand = TF.expand_dims(alpha_tf, 0)  # 1 x 2 x nx_out x ny_out
@@ -1009,7 +1009,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
     # normalize the Gaussian bump for the target so that the peak is 1, nt * nx_out * ny_out * nj
     targets_gauss = TF.exp(-TF.reduce_sum(TF.square(alpha_expand - target_expand), axis=1) /
                            (2 * (dgp_cfg.lengthscale ** 2)))
-    gauss_max = TF.reduce_max(TF.reduce_max(targets_gauss, [1]), [1]) + TF.constant(1e-5, TF.float64)
+    gauss_max = TF.reduce_max(TF.reduce_max(targets_gauss, [1]), [1]) + TF.constant(1e-5, TF.float32)
     gauss_max = TF.expand_dims(TF.expand_dims(gauss_max, [1]), [2])
     targets_gauss = targets_gauss / gauss_max
     targets_gauss = TF.transpose(TF.reshape(targets_gauss, [-1, nj, nx_out, ny_out]), [0, 2, 3, 1])
