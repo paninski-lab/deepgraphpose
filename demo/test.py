@@ -1,41 +1,9 @@
-import tensorflow as tf
-import cv2 as cv
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 import os
 
-import importlib
-import logging
-import time
-import os
-from os import listdir
-from os.path import isfile, join
-from pathlib import Path
-from random import randint
-
-import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
-
-import deeplabcut
-from deeplabcut.pose_estimation_tensorflow.config import load_config
-from deeplabcut.pose_estimation_tensorflow.dataset.factory import (
-    create as create_dataset, )
-from deeplabcut.pose_estimation_tensorflow.dataset.pose_defaultdataset import PoseDataset
-from deeplabcut.pose_estimation_tensorflow.nnet.net_factory import pose_net
-from deeplabcut.pose_estimation_tensorflow.train import LearningRate, get_batch_spec, \
-    setup_preloading, start_preloading, get_optimizer
-from deeplabcut.utils import auxiliaryfunctions
-from deeplabcut.pose_estimation_tensorflow.nnet.pose_net import PoseNet, losses, \
-    prediction_layer
-
-from deepgraphpose.dataset import MultiDataset, coord2map
-from deepgraphpose.models.fitdgp_util import gen_batch, argmax_2d_from_cm, combine_all_marker, build_aug, data_aug, learn_wt
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-from deepgraphpose.models.fitdgp import fit_dgp_labeledonly
 from deepgraphpose.models.fitdgp import fit_dgp
 
 vers = tf.__version__.split('.')
@@ -730,17 +698,16 @@ else:
 #     return loss
 
 if __name__ == '__main__':
-    print('test')
-    # print(tf.__version__)
     # dlcpath = "/Users/sethdonaldson/data/track_graph3d/bird1-selmaan-2030-01-01" # personal machine path
-    # dlcpath = "/home/sd3470/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # axon path
-    # shuffle = 1
-    # batch_size = 1
-    # snapshot = 'snapshot-step0-final--0'
-    # step = 2
+    base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
+    dlcpath = base_path + "deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # axon path
+    shuffle = 1
+    batch_size = 1
+    snapshot = 'snapshot-step0-final--0'
+    step = 2
     # gm2, gm3 = 1, 3
     #
     # # tf.enable_eager_execution()
-    # fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step)
+    fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step)
 
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
