@@ -576,7 +576,7 @@ def fit_dgp_eager(
             # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
             epipolar_loss = 0.1 * compute_epipolar_loss(v1_pts, v2_pts, F)
             # loss['epipolar_loss'] += epipolar_loss
-        print(epipolar_loss)
+        print(all_frame_batch + " " + epipolar_loss)
         # total_loss += loss['epipolar_loss']
 
         tf.reset_default_graph()
@@ -920,7 +920,7 @@ if __name__ == '__main__':
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
     dlcpath = base_path + "/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # axon path
     shuffle = 1
-    batch_size = 10
+    batch_size = 1
     snapshot = 'snapshot-step0-final--0'
     step = 2
     # gm2, gm3 = 1, 3
