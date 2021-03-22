@@ -566,6 +566,26 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
     # number of unlabeled labeled frames across video sets, we refer to them as hidden frames
     n_hidden_frames_total = n_frames_total - n_visible_frames_total
 
+    # Calculate the upper bounds for spatial distances
+    joint_locs = [d.labels for d in data_batcher.datasets]
+    joint_loc_full = np.empty((0, nj, 2))
+    for j in joint_locs:
+        if len(j) > 0:
+            joint_loc_full = np.vstack((j, joint_loc_full))
+
+    joint_loc_full1 = np.copy(joint_loc_full).swapaxes(1, 2).reshape(-1, nj)
+    joint_loc_full1[np.isnan(joint_loc_full1)] = 1e10
+    limb_full = np.matmul(joint_loc_full1, S0.T)
+    limb_full[np.abs(limb_full) > 1e5] = 0
+    limb_full = np.reshape(limb_full, [joint_loc_full.shape[0], 2, -1])
+    limb_full = np.sqrt(np.sum(np.square(limb_full), 1))
+    limb_full = limb_full.T * dgp_cfg.stride + dgp_cfg.stride / 2
+    ws_max = np.max(np.nan_to_num(limb_full), 1) * dgp_cfg.ws_max
+
+    limb_full = np.true_divide(limb_full.sum(1), (limb_full != 0).sum(1))
+    ws = 1 / (np.nan_to_num(
+        limb_full) + 1e-20) * dgp_cfg.ws  # spatial clique parameter based on the limb length and dlc_cfg.ws
+
     # feed_dict
     inputs = feed_dict['inputs']
     targets = feed_dict['targets']
@@ -579,6 +599,21 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
     wt_batch_pl = feed_dict['wt_batch_pl']
     wt_batch_mask_pl = feed_dict['wt_batch_mask_pl']
     video_names = feed_dict['video_names'] # used in getting the appropiate views for computing epipolar loss
+    alpha_tf = feed_dict['alpha_tf']
+
+
+    wt_batch_tf = TF.multiply(wt_batch_pl, wt_batch_mask_pl)  # wt vector for the batch
+    wt_max_tf = TF.constant(dgp_cfg.wt_max, TF.float32)  # placeholder for the upper bounds for the temporal clique wt
+
+    wn_visible_tf = TF.constant(dgp_cfg.wn_visible,
+                                TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
+    wn_hidden_tf = TF.constant(dgp_cfg.wn_hidden,
+                               TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
+
+    ws_tf = TF.constant(ws, TF.float32)  # placeholder for the spatial clique ws; it varies across joints
+    ws_max_tf = TF.constant(ws_max,
+                            TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
+    vector_field_tf = TF.placeholder(TF.float32, shape=[None, None, None])  # placeholder for the vector fields
 
     # Build the network
     pn = PoseNet(dgp_cfg) # todo: why is this here? (as opposed to outside of the loss function)
@@ -615,7 +650,6 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
     target_expand = TF.expand_dims(TF.expand_dims(targets_all_marker, 2), 3)  # (nt*nj) x 2 x 1 x 1
 
     # 2d grid of the output
-    alpha_tf = feed_dict['alpha_tf']
     alpha_expand = TF.expand_dims(alpha_tf, 0)  # 1 x 2 x nx_out x ny_out
 
     # normalize the Gaussian bump for the target so that the peak is 1, nt * nx_out * ny_out * nj
@@ -679,12 +713,12 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
         loss["hidden_loss_pred"] = TF.losses.sigmoid_cross_entropy(targets_gauss_h, pred_h_scaled1,
                                                                    weights=(1 - pgm_h2)) * \
                                    n_visible_frames_total / n_hidden_frames_total * \
-                                   n_hidden_frames_batch / n_visible_frames_batch
+                                   n_hidden_frames_batch / n_visible_frames_batch * wn_hidden_tf / wn_visible_tf
 
     elif dgp_cfg.gm3 == 0:
         loss["hidden_loss_pred"] = TF.losses.sigmoid_cross_entropy(targets_gauss_h, pred_h, 1.0) * \
                                    n_visible_frames_total / n_hidden_frames_total * \
-                                   n_hidden_frames_batch / n_visible_frames_batch
+                                   n_hidden_frames_batch / n_visible_frames_batch * wn_hidden_tf / wn_visible_tf
     else:
         raise Exception('Not implemented')
 
@@ -704,7 +738,11 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
 
     loss_func = losses.huber_loss if dgp_cfg.locref_huber_loss else TF.losses.mean_squared_error
     loss['visible_loss_locref'] = dgp_cfg.locref_loss_weight * loss_func(locref_map_v, locref_pred_v, locref_mask_v)
+    total_loss = total_loss + loss['visible_loss_locref']
 
+    # ------------------------------------------------------------------------------------
+    # Cliques
+    # ------------------------------------------------------------------------------------
     targets_all_marker_3c = TF.reshape(targets_all_marker, [nt_batch_pl, nj, -1])  # targets_all_marker with 3 columns
 
     F_dict = data_batcher.fundamental_mat_dict
@@ -726,7 +764,96 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
 
     total_loss += loss['epipolar_loss']
 
-    return loss
+    # Spatial clique
+    if nl > 0:
+        S = TF.constant(S0, dtype=TF.float32)
+        targets_all_marker_spatial = TF.reshape(TF.transpose(targets_all_marker_3c, [1, 2, 0]),
+                                                [nj, -1]) * dgp_cfg.stride + 0.5 * dgp_cfg.stride
+        dist_targets = TF.sqrt(
+            TF.reduce_sum(
+                TF.square(TF.reshape(TF.matmul(S, targets_all_marker_spatial), [nl, 2, -1])), [1]))
+        ws_max_tf_expand = TF.expand_dims(ws_max_tf, [1])
+        dist_targets_th = TF.nn.relu(dist_targets - ws_max_tf_expand) + ws_max_tf_expand
+
+        loss['ws_loss'] = TF.reduce_sum(dist_targets_th * TF.reshape(ws_tf, [-1, 1])) / tf.cast(nx_out,
+                                                                                                tf.float32) / tf.cast(
+            ny_out, tf.float32)
+        loss['ws_loss'] = loss['ws_loss'] * n_visible_frames_total / n_visible_frames_batch / (
+                n_visible_frames_total + n_hidden_frames_total) / wn_visible_tf
+        total_loss += loss['ws_loss']
+
+    # Temporal clique
+    if dgp_cfg.wt > 0:
+        targets_all_marker_temporal = targets_all_marker_3c * dgp_cfg.stride + 0.5 * dgp_cfg.stride
+        targets_all_marker_temporal0 = targets_all_marker_temporal[:-1, :, :]
+        targets_all_marker_temporal1 = targets_all_marker_temporal[1:, :, :]
+        time_dif0 = TF.sqrt(TF.reduce_sum(TF.square(targets_all_marker_temporal0 - targets_all_marker_temporal1), 2))
+
+        nx_in, ny_in = tf.cast(tf.shape(vector_field_tf)[1], tf.float32), tf.cast(tf.shape(vector_field_tf)[2],
+                                                                                  tf.float32)
+
+        targets_box_row0 = tf.reshape(targets_all_marker_temporal0[:, :, 0], [-1, ])
+        targets_box_col0 = tf.reshape(targets_all_marker_temporal0[:, :, 1], [-1, ])
+        targets_box_row1 = tf.reshape(targets_all_marker_temporal1[:, :, 0], [-1, ])
+        targets_box_col1 = tf.reshape(targets_all_marker_temporal1[:, :, 1], [-1, ])
+
+        targets_box_row_min = tf.reduce_min(tf.stack((targets_box_row0, targets_box_row1), axis=1), 1)
+        targets_box_row_max = tf.reduce_max(tf.stack((targets_box_row0, targets_box_row1), axis=1), 1)
+        targets_box_col_min = tf.reduce_min(tf.stack((targets_box_col0, targets_box_col1), axis=1), 1)
+        targets_box_col_max = tf.reduce_max(tf.stack((targets_box_col0, targets_box_col1), axis=1), 1)
+
+        window = 10
+        targets_box_row_min = tf.math.maximum(tf.constant(0, tf.float32), targets_box_row_min - window)
+        targets_box_row_max = tf.math.minimum(nx_in, targets_box_row_max + window)
+        targets_box_col_min = tf.math.maximum(tf.constant(0, tf.float32), targets_box_col_min - window)
+        targets_box_col_max = tf.math.minimum(ny_in, targets_box_col_max + window)
+
+        boxes = tf.transpose(tf.stack((
+            targets_box_row_min / nx_in, targets_box_col_min / ny_in, targets_box_row_max / nx_in,
+            targets_box_col_max / ny_in)))
+        box_indices = tf.reshape(tf.transpose(tf.reshape(tf.tile(tf.range(0, nt_batch_pl - 1), [nj]), [nj, -1])),
+                                 [-1, ])
+
+        vector_field_tf3 = tf.expand_dims(vector_field_tf, 3)
+        vector_field_tf_crop = tf.image.crop_and_resize(vector_field_tf3, boxes, box_indices, [nx_in, ny_in])
+        vector_field_tf_crop = tf.reshape(vector_field_tf_crop, [-1, nj, nx_in, ny_in])
+        vector_field_tf_meanflow = tf.reduce_mean(vector_field_tf_crop, [2, 3])
+
+        vector_field_tf_meanflow_inv = 1 / (vector_field_tf_meanflow + tf.constant(1e-10))
+        vector_field_tf_meanflow_inv = tf.math.minimum(vector_field_tf_meanflow_inv, 1)
+        vector_field_tf_meanflow_inv = tf.exp(tf.log(vector_field_tf_meanflow_inv) * 3)
+        vector_field_tf_meanflow_inv = tf.math.minimum(vector_field_tf_meanflow_inv, 1)
+        vector_field_tf_meanflow_inv = vector_field_tf_meanflow_inv * TF.reshape(wt_batch_tf, [-1, 1]) / tf.cast(nx_out,
+                                                                                                                 tf.float32) / tf.cast(
+            ny_out, tf.float32)
+
+        dist_targets_th_wt = (TF.nn.relu(time_dif0 - wt_max_tf) + wt_max_tf) * vector_field_tf_meanflow_inv
+
+        loss['wt_loss'] = TF.norm(dist_targets_th_wt, 2)
+        loss['wt_loss'] = loss['wt_loss'] * n_visible_frames_total / n_visible_frames_batch / (
+                n_visible_frames_total + n_hidden_frames_total) / wn_visible_tf
+        total_loss += loss['wt_loss']
+
+    loss['total_loss'] = total_loss
+
+    total_loss_visible = loss['visible_loss_pred'] + loss['visible_loss_locref']
+
+    placeholders = {'inputs': inputs,
+                    'targets': targets,
+                    'locref_map': locref_map,
+                    'locref_mask': locref_mask,
+                    'visible_marker_pl': visible_marker_pl,
+                    'hidden_marker_pl': hidden_marker_pl,
+                    'visible_marker_in_targets_pl': visible_marker_in_targets_pl,
+                    'wt_batch_mask_pl': wt_batch_mask_pl,
+                    'vector_field_tf': vector_field_tf,
+                    'nt_batch_pl': nt_batch_pl,
+                    'wt_batch_pl': wt_batch_pl,
+                    'alpha_tf': alpha_tf,
+                    'video_names': video_names
+                    }
+
+    return loss, total_loss, total_loss_visible, placeholders
 
 if __name__ == '__main__':
     # dlcpath = "/Users/sethdonaldson/sourceCode/neuro/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal machine path
@@ -740,6 +867,6 @@ if __name__ == '__main__':
     #
     # # tf.enable_eager_execution()
     print(dlcpath)
-    fit_dgp_eager(snapshot, dlcpath, shuffle=shuffle, step=step)
+    fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step)
 
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)

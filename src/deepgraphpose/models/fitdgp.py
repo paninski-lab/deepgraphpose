@@ -386,7 +386,7 @@ def fit_dgp_labeledonly(
     # Build model
     # ------------------------------------------------------------------------------------
     TF.reset_default_graph()
-    loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg)
+    loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg, define_placeholders(data_batcher.nj))
     learning_rate = TF.placeholder(tf.float32, shape=[])
 
     # Restore network parameters for RESNET and COVNET
@@ -694,7 +694,7 @@ def fit_dgp(
     # Build model
     # ------------------------------------------------------------------------------------
     TF.reset_default_graph()
-    loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg)
+    loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg, define_placeholders(data_batcher.nj))
     learning_rate = TF.placeholder(tf.float32, shape=[])
 
     # Restore network parameters for RESNET and COVNET
@@ -892,7 +892,7 @@ def fit_dgp(
     return None
 
 
-def dgp_loss(data_batcher, dgp_cfg):
+def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
     """Construct the loss for DGP.
     Parameters
     ----------
@@ -938,34 +938,21 @@ def dgp_loss(data_batcher, dgp_cfg):
     ws = 1 / (np.nan_to_num(
         limb_full) + 1e-20) * dgp_cfg.ws  # spatial clique parameter based on the limb length and dlc_cfg.ws
 
-    # Define placeholders
-    # input and output
-    inputs = TF.placeholder(TF.float32, shape=[None, None, None, 3])
-    targets = TF.placeholder(TF.float32, shape=[None, nj, 2])
+    # feed_dict
+    inputs = placeholder_dict['inputs']
+    targets = placeholder_dict['targets']
     targets_nonan = TF.where(TF.is_nan(targets), TF.ones_like(targets) * 0, targets)  # set nan to be 0 in targets
+    locref_map = placeholder_dict['locref_map']
+    locref_mask = placeholder_dict['locref_mask']
+    visible_marker_pl = placeholder_dict['visible_marker_pl']
+    hidden_marker_pl = placeholder_dict['hidden_marker_pl']
+    visible_marker_in_targets_pl = placeholder_dict['visible_marker_in_targets_pl']
+    nt_batch_pl = placeholder_dict['nt_batch_pl']
+    wt_batch_pl = placeholder_dict['wt_batch_pl']
+    wt_batch_mask_pl = placeholder_dict['wt_batch_mask_pl']
+    video_names = placeholder_dict['video_names']  # used in getting the appropiate views for computing epipolar loss
+    alpha_tf = placeholder_dict['alpha_tf']
 
-    # local refinement
-    locref_map = TF.placeholder(TF.float32, shape=[None, None, None, nj * 2])
-    locref_mask = TF.placeholder(TF.float32, shape=[None, None, None, nj * 2])
-
-    # placeholders for parameters
-    visible_marker_pl = TF.placeholder(TF.int32, shape=[
-        None,
-    ])  # placeholder for visible marker index in the batch
-    hidden_marker_pl = TF.placeholder(TF.int32, shape=[
-        None,
-    ])  # placeholder for hidden marker index in the batch
-    visible_marker_in_targets_pl = TF.placeholder(TF.int32, shape=[
-        None,
-    ])  # placeholder for visible marker index in targets/visible frames
-
-    nt_batch_pl = TF.placeholder(TF.int32, shape=[])  # placeholder for the total number of frames in the batch
-
-    wt_batch_pl = TF.placeholder(TF.float32, shape=[
-        None, ])  # placeholder for the temporal clique wt; it's a vector which can contain different clique values for different frames
-    wt_batch_mask_pl = TF.placeholder(TF.float32, shape=[
-        None,
-    ])  # placeholder for the batch mask for wt, 1 means wt is in the batch; 0 means wt is not in the batch
     wt_batch_tf = TF.multiply(wt_batch_pl, wt_batch_mask_pl)  # wt vector for the batch
     wt_max_tf = TF.constant(dgp_cfg.wt_max, TF.float32)  # placeholder for the upper bounds for the temporal clique wt
 
@@ -978,8 +965,6 @@ def dgp_loss(data_batcher, dgp_cfg):
     ws_max_tf = TF.constant(ws_max,
                             TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
     vector_field_tf = TF.placeholder(TF.float32, shape=[None, None, None])  # placeholder for the vector fields
-    # todo: @Sun I'm not sure if this will work
-    video_names = TF.placeholder(TF.string, shape=[None])  # used in getting the appropiate views for computing epipolar loss
 
     # Build the network
     pn = PoseNet(dgp_cfg)
@@ -1013,7 +998,6 @@ def dgp_loss(data_batcher, dgp_cfg):
     target_expand = TF.expand_dims(TF.expand_dims(targets_all_marker, 2), 3)  # (nt*nj) x 2 x 1 x 1
 
     # 2d grid of the output
-    alpha_tf = TF.placeholder(tf.float32, shape=[2, None, None], name="2dgrid")
     alpha_expand = TF.expand_dims(alpha_tf, 0)  # 1 x 2 x nx_out x ny_out
 
     # normalize the Gaussian bump for the target so that the peak is 1, nt * nx_out * ny_out * nj
@@ -1218,6 +1202,50 @@ def dgp_loss(data_batcher, dgp_cfg):
     return loss, total_loss, total_loss_visible, placeholders
 
 
+# todo: write docstring
+def define_placeholders(nj):
+    # Define placeholders
+    # input and output
+    inputs = TF.placeholder(TF.float32, shape=[None, None, None, 3])
+    targets = TF.placeholder(TF.float32, shape=[None, nj, 2])
+    targets_nonan = TF.where(TF.is_nan(targets), TF.ones_like(targets) * 0, targets)  # set nan to be 0 in targets
+
+    # local refinement
+    locref_map = TF.placeholder(TF.float32, shape=[None, None, None, nj * 2])
+    locref_mask = TF.placeholder(TF.float32, shape=[None, None, None, nj * 2])
+
+    # placeholders for parameters
+    visible_marker_pl = TF.placeholder(TF.int32, shape=[None,])  # placeholder for visible marker index in the batch
+    hidden_marker_pl = TF.placeholder(TF.int32, shape=[None,])  # placeholder for hidden marker index in the batch
+    visible_marker_in_targets_pl = TF.placeholder(TF.int32, shape=[None,])  # placeholder for visible marker index in targets/visible frames
+
+    nt_batch_pl = TF.placeholder(TF.int32, shape=[])  # placeholder for the total number of frames in the batch
+
+    wt_batch_pl = TF.placeholder(TF.float32, shape=[None,])  # placeholder for the temporal clique wt; it's a vector which can contain different clique values for different frames
+    wt_batch_mask_pl = TF.placeholder(TF.float32, shape=[None,])  # placeholder for the batch mask for wt, 1 means wt is in the batch; 0 means wt is not in the batch
+    video_names = TF.placeholder(TF.string,
+                                 shape=[None])  # used in getting the appropiate views for computing epipolar loss
+    alpha_tf = TF.placeholder(tf.float32, shape=[2, None, None], name="2dgrid")
+
+    # placeholder_dict
+    placeholder_dict = {}
+    placeholder_dict['inputs'] = inputs
+    placeholder_dict['targets'] = targets
+    placeholder_dict['locref_map'] = locref_map
+    placeholder_dict['locref_mask'] = locref_mask
+    placeholder_dict['visible_marker_pl'] = visible_marker_pl
+    placeholder_dict['hidden_marker_pl'] = hidden_marker_pl
+    placeholder_dict['visible_marker_in_targets_pl'] = visible_marker_in_targets_pl
+    placeholder_dict['nt_batch_pl'] = nt_batch_pl
+    placeholder_dict['wt_batch_pl'] = wt_batch_pl
+    placeholder_dict['wt_batch_mask_pl'] = wt_batch_mask_pl
+    placeholder_dict['video_names'] = video_names
+    placeholder_dict['alpha_tf'] = alpha_tf
+
+    return placeholder_dict
+
+
+# todo: write docstring
 def compute_epipolar_loss(v1_pts, v2_pts, F):
     # convert to homogeneous coordinates
     ones = tf.ones_like(v1_pts)[:,0]
