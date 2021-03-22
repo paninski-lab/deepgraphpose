@@ -994,8 +994,8 @@ def dgp_loss(data_batcher, dgp_cfg, placeholder_dict):
 
     # Combine visible markers and hidden markers to construct a full vector for all frames and all markers
     # set hidden_marker_pl and visible_marker_pl to int32 (instead of int64) for some reason
-    hidden_marker_pl = hidden_marker_pl.astype('int32')
-    visible_marker_pl = visible_marker_pl.astype('int32')
+    hidden_marker_pl = tf.cast(hidden_marker_pl, tf.int32)
+    visible_marker_pl = tf.cast(visible_marker_pl, tf.int32)
     targets_all_marker = combine_all_marker(targets_pred_hidden_marker, targets_visible_marker, hidden_marker_pl,
                                             visible_marker_pl, nj, nt_batch_pl)
 
