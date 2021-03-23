@@ -851,7 +851,8 @@ def fit_dgp(
         start_time00 = time.time()
         [loss_eval, _] = sess.run([loss, train_op], feed_dict)
         end_time00 = time.time()
-        if it % displayiters == 0 and it > 0:
+        # if it % displayiters == 0 and it > 0:
+        if it >= 0:
             print('\nIteration {}/{}'.format(it, maxiters))
 
             print('dataset_i: ', dataset_i, flush=True)
