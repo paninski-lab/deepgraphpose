@@ -1116,7 +1116,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
         v2_pts = targets_pred_marker[name2_idx * num_pts_per_view:name2_idx * num_pts_per_view + num_pts_per_view]
         # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
         # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
-        epipolar_loss = 0.1 * compute_epipolar_loss(v1_pts, v2_pts, F)
+        epipolar_loss = 0.05 * compute_epipolar_loss(v1_pts, v2_pts, F)
         loss['epipolar_loss'] += epipolar_loss
 
     total_loss += loss['epipolar_loss']
