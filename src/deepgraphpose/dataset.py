@@ -947,6 +947,7 @@ class MultiDataset:
         self.n_hidden_frames_total = 0  # selected hidden (unlabeled) frames
         self.n_frames_total = 0  # labeled + selected hidden + temporal windows
         for i, dataset in enumerate(self.datasets):
+            print('Video: ', dataset.video_name, ' has ', len(dataset.idxs['pv']), ' visible frames selected; ', len(dataset.idxs['ph']), ' hidden frames selected.')
             self.n_visible_frames_total += len(dataset.idxs['pv'])
             self.n_hidden_frames_total += len(dataset.idxs['ph'])
 

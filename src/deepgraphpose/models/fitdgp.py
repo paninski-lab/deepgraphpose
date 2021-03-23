@@ -725,7 +725,7 @@ def fit_dgp(
     # ------------------------------------------------------------------------------------
     batch_ind_all = gen_batch(visible_frame_total, hidden_frame_total, all_frame_total, dgp_cfg, maxiters)
     save_iters = np.int(saveiters / dgp_cfg.batch_size)
-    maxiters = batch_ind_all.shape[0]
+    maxiters = len(batch_ind_all)
 
     pdata = PoseDataset(dgp_cfg)
     data_batcher.reset()
