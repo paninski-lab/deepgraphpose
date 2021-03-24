@@ -863,7 +863,8 @@ def fit_dgp(
             print('\n loss: ', loss_eval, flush=True)
 
         # save the distinct losses
-        epipolar_losses.append(loss_eval['epipolar_loss'])
+        # epipolar_losses.append(loss_eval['epipolar_loss'])
+        epipolar_losses.append(0)
         vis_losses.append(loss_eval['visible_loss_pred'])
         hid_losses.append(loss_eval['hidden_loss_pred'])
         vis_loss_locref.append(loss_eval['visible_loss_locref'])
@@ -1102,7 +1103,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
     # F_dict = data_batcher.fundamental_mat_dict
     # num_pts_per_frame = targets_pred.shape[1]
     # num_pts_per_view = tf.dtypes.cast(num_pts_per_frame * nt_batch_pl, tf.int64) # need to cast this as an int64 for some reason or it breaks
-    loss['epipolar_loss'] = 0
+    # loss['epipolar_loss'] = 0
     # for key, F in F_dict.items():
     #     v1_name, v2_name = key.split(data_batcher.F_dict_key_delim)
     #     # get coordinates of predictions for video 1
