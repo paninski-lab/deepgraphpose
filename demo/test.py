@@ -393,23 +393,23 @@ def fit_dgp_eager(
     TF.reset_default_graph()
 
     # Restore network parameters for RESNET and COVNET
-    # variables_to_restore0 = slim.get_variables_to_restore(
-    #     include=['pose/part_pred'])
-    # variables_to_restore1 = slim.get_variables_to_restore(
-    #     include=['pose/locref_pred'])
-    # variables_to_restore2 = slim.get_variables_to_restore(include=['resnet'])
-    # restorer = TF.train.Saver(variables_to_restore0 + variables_to_restore1 +
-    #                           variables_to_restore2)
+    variables_to_restore0 = slim.get_variables_to_restore(
+        include=['pose/part_pred'])
+    variables_to_restore1 = slim.get_variables_to_restore(
+        include=['pose/locref_pred'])
+    variables_to_restore2 = slim.get_variables_to_restore(include=['resnet'])
+    restorer = TF.train.Saver(variables_to_restore0 + variables_to_restore1 +
+                              variables_to_restore2)
     # saver = TF.train.Saver(max_to_keep=dgp_cfg.max_to_keep)
 
     # Set up session
-    # allow_growth = True
-    # if allow_growth:
-    #     config = TF.ConfigProto()
-    #     config.gpu_options.allow_growth = True
-    #     sess = TF.Session(config=config)
-    # else:
-    #     sess = TF.Session()
+    allow_growth = True
+    if allow_growth:
+        config = TF.ConfigProto()
+        config.gpu_options.allow_growth = True
+        sess = TF.Session(config=config)
+    else:
+        sess = TF.Session()
 
     # %%
     # ------------------------------------------------------------------------------------
@@ -522,7 +522,8 @@ def fit_dgp_eager(
             'video_names': video_names
         }
 
-        # loss = dgp_loss(data_batcher, dgp_cfg, placeholders=feed_dict)
+
+        [loss_eval, _] = dgp_loss(data_batcher, dgp_cfg, placeholders=feed_dict)
 
 
 
@@ -533,53 +534,58 @@ def fit_dgp_eager(
 
 
 
-        # Epipolar clique
-        # todo: make this conditional based on whether or not training is "multiview"
-        # todo: as it stands right now, I am not incorporating any hard labels, strictly constraining the predictions -> may be helpful to incorporate hard labels
-        # todo: consider scaling loss by confidence of prediction?
-        # todo: need a weight for the clique?
-        # Build the network
-        pn = PoseNet(dgp_cfg)
-        net, end_points = pn.extract_features(all_data_batch_ids)
-        scope = "pose"
-        reuse = None
-        heads = {}
-        # two convnets, one is the prediction network, the other is the local refinement network.
-        with TF.variable_scope(scope, reuse=reuse):
-            heads["part_pred"] = prediction_layer(dgp_cfg, net, "part_pred", nj)
-            heads["locref"] = prediction_layer(dgp_cfg, net, "locref_pred", nj * 2)
 
-        pred = heads['part_pred']
-        targets_pred, confidencemap_softmax = argmax_2d_from_cm(pred, nj, dgp_cfg.gamma, dgp_cfg.gauss_len)
 
-        # Read the 2D targets from pred
-        nx_out, ny_out = tf.shape(pred)[1], tf.shape(pred)[2]
-        targets_pred, confidencemap_softmax = argmax_2d_from_cm(pred, nj, dgp_cfg.gamma, dgp_cfg.gauss_len)
-        targets_pred_marker = TF.reshape(targets_pred, [-1, 2])  # 2d locations for all markers
-        targets_pred_hidden_marker = TF.gather(targets_pred_marker,
-                                               hidden_marker)  # 2d locations for hidden markers, predicted targets from the network
 
-        F_dict = data_batcher.fundamental_mat_dict
-        num_pts_per_frame = targets_pred.shape[1]
-        num_pts_per_view = tf.dtypes.cast(num_pts_per_frame * nt_batch,
-                                          tf.int64)  # need to cast this as an int64 for some reason or it breaks
-        # loss['epipolar_loss'] = 0
-        for key, F in F_dict.items():
-            v1_name, v2_name = key.split(data_batcher.F_dict_key_delim)
-            # get coordinates of predictions for video 1
-            name1_idx = tf.where(tf.equal(video_names, v1_name))[0][0]
-            v1_pts = targets_pred_marker[name1_idx * num_pts_per_view:name1_idx * num_pts_per_view + num_pts_per_view]
-            # get coordinates of predictions for video 2
-            name2_idx = tf.where(tf.equal(video_names, v2_name))[0][0]
-            v2_pts = targets_pred_marker[name2_idx * num_pts_per_view:name2_idx * num_pts_per_view + num_pts_per_view]
-            # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
-            # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
-            epipolar_loss = 0.1 * compute_epipolar_loss(v1_pts, v2_pts, F)
-            # loss['epipolar_loss'] += epipolar_loss
-        print(all_frame_batch, epipolar_loss)
-        # total_loss += loss['epipolar_loss']
 
-        tf.reset_default_graph()
+        # this code will just run epipolar loss on each batch, no updates to the network
+        # # Epipolar clique
+        # # todo: make this conditional based on whether or not training is "multiview"
+        # # todo: as it stands right now, I am not incorporating any hard labels, strictly constraining the predictions -> may be helpful to incorporate hard labels
+        # # todo: consider scaling loss by confidence of prediction?
+        # # todo: need a weight for the clique?
+        # # Build the network
+        # pn = PoseNet(dgp_cfg)
+        # net, end_points = pn.extract_features(all_data_batch_ids)
+        # scope = "pose"
+        # reuse = None
+        # heads = {}
+        # # two convnets, one is the prediction network, the other is the local refinement network.
+        # with TF.variable_scope(scope, reuse=reuse):
+        #     heads["part_pred"] = prediction_layer(dgp_cfg, net, "part_pred", nj)
+        #     heads["locref"] = prediction_layer(dgp_cfg, net, "locref_pred", nj * 2)
+        #
+        # pred = heads['part_pred']
+        # targets_pred, confidencemap_softmax = argmax_2d_from_cm(pred, nj, dgp_cfg.gamma, dgp_cfg.gauss_len)
+        #
+        # # Read the 2D targets from pred
+        # nx_out, ny_out = tf.shape(pred)[1], tf.shape(pred)[2]
+        # targets_pred, confidencemap_softmax = argmax_2d_from_cm(pred, nj, dgp_cfg.gamma, dgp_cfg.gauss_len)
+        # targets_pred_marker = TF.reshape(targets_pred, [-1, 2])  # 2d locations for all markers
+        # targets_pred_hidden_marker = TF.gather(targets_pred_marker,
+        #                                        hidden_marker)  # 2d locations for hidden markers, predicted targets from the network
+        #
+        # F_dict = data_batcher.fundamental_mat_dict
+        # num_pts_per_frame = targets_pred.shape[1]
+        # num_pts_per_view = tf.dtypes.cast(num_pts_per_frame * nt_batch,
+        #                                   tf.int64)  # need to cast this as an int64 for some reason or it breaks
+        # # loss['epipolar_loss'] = 0
+        # for key, F in F_dict.items():
+        #     v1_name, v2_name = key.split(data_batcher.F_dict_key_delim)
+        #     # get coordinates of predictions for video 1
+        #     name1_idx = tf.where(tf.equal(video_names, v1_name))[0][0]
+        #     v1_pts = targets_pred_marker[name1_idx * num_pts_per_view:name1_idx * num_pts_per_view + num_pts_per_view]
+        #     # get coordinates of predictions for video 2
+        #     name2_idx = tf.where(tf.equal(video_names, v2_name))[0][0]
+        #     v2_pts = targets_pred_marker[name2_idx * num_pts_per_view:name2_idx * num_pts_per_view + num_pts_per_view]
+        #     # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
+        #     # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
+        #     epipolar_loss = 0.1 * compute_epipolar_loss(v1_pts, v2_pts, F)
+        #     # loss['epipolar_loss'] += epipolar_loss
+        # print(all_frame_batch, epipolar_loss)
+        # # total_loss += loss['epipolar_loss']
+        #
+        # tf.reset_default_graph()
 
 
         start_time00 = time.time()
