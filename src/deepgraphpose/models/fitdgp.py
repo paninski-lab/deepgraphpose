@@ -863,8 +863,8 @@ def fit_dgp(
             print('\n loss: ', loss_eval, flush=True)
 
         # save the distinct losses
-        # epipolar_losses.append(loss_eval['epipolar_loss'])
-        epipolar_losses.append(0)
+        epipolar_losses.append(loss_eval['epipolar_loss'])
+        # epipolar_losses.append(0)
         vis_losses.append(loss_eval['visible_loss_pred'])
         hid_losses.append(loss_eval['hidden_loss_pred'])
         vis_loss_locref.append(loss_eval['visible_loss_locref'])
@@ -1100,24 +1100,24 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
     # # todo: as it stands right now, I am not incorporating any hard labels, strictly constraining the predictions -> may be helpful to incorporate hard labels
     # # todo: consider scaling loss by confidence of prediction?
     # # todo: need a weight for the clique?
-    # F_dict = data_batcher.fundamental_mat_dict
-    # num_pts_per_frame = targets_pred.shape[1]
-    # num_pts_per_view = tf.dtypes.cast(num_pts_per_frame * nt_batch_pl, tf.int64) # need to cast this as an int64 for some reason or it breaks
-    # loss['epipolar_loss'] = 0
-    # for key, F in F_dict.items():
-    #     v1_name, v2_name = key.split(data_batcher.F_dict_key_delim)
-    #     # get coordinates of predictions for video 1
-    #     name1_idx = tf.where(tf.equal(video_names, v1_name))[0][0]
-    #     v1_pts = targets_pred_marker[name1_idx * num_pts_per_view:name1_idx * num_pts_per_view + num_pts_per_view]
-    #     # get coordinates of predictions for video 2
-    #     name2_idx = tf.where(tf.equal(video_names, v2_name))[0][0]
-    #     v2_pts = targets_pred_marker[name2_idx * num_pts_per_view:name2_idx * num_pts_per_view + num_pts_per_view]
-    #     # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
-    #     # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
-    #     epipolar_loss = 0.05 * compute_epipolar_loss(v1_pts, v2_pts, F)
-    #     loss['epipolar_loss'] += epipolar_loss
-    #
-    # total_loss += loss['epipolar_loss']
+    F_dict = data_batcher.fundamental_mat_dict
+    num_pts_per_frame = targets_pred.shape[1]
+    num_pts_per_view = tf.dtypes.cast(num_pts_per_frame * nt_batch_pl, tf.int64) # need to cast this as an int64 for some reason or it breaks
+    loss['epipolar_loss'] = 0
+    for key, F in F_dict.items():
+        v1_name, v2_name = key.split(data_batcher.F_dict_key_delim)
+        # get coordinates of predictions for video 1
+        name1_idx = tf.where(tf.equal(video_names, v1_name))[0][0]
+        v1_pts = targets_pred_marker[name1_idx * num_pts_per_view:name1_idx * num_pts_per_view + num_pts_per_view]
+        # get coordinates of predictions for video 2
+        name2_idx = tf.where(tf.equal(video_names, v2_name))[0][0]
+        v2_pts = targets_pred_marker[name2_idx * num_pts_per_view:name2_idx * num_pts_per_view + num_pts_per_view]
+        # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
+        # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
+        epipolar_loss = 0.1 * compute_epipolar_loss(v1_pts, v2_pts, F)
+        loss['epipolar_loss'] += epipolar_loss
+
+    total_loss += loss['epipolar_loss']
 
 
     # Spatial clique
