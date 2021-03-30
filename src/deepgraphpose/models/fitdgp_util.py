@@ -378,11 +378,11 @@ def argmax_2d_from_cm(tensor, nj, gamma=1, gauss_len=2, th=None):
 
     if th is not None:
         st = TF.reshape(TF.transpose(softmax_tensor, [0, 3, 1, 2]),
-                        [-1, softmax_tensor.shape[1], softmax_tensor.shape[2]])
+                        [-1, H, W])
         mst = TF.expand_dims(TF.expand_dims(TF.reduce_max(TF.reduce_max(st, 1), 1), 1), 1)
 
         softmax_tensor_th = TF.where(st < mst * th, TF.zeros_like(st) * 0, st)
-        softmax_tensor_th = TF.reshape(softmax_tensor_th, [-1, nj, softmax_tensor.shape[1], softmax_tensor.shape[2]])
+        softmax_tensor_th = TF.reshape(softmax_tensor_th, [-1, nj, H, W])
         softmax_tensor = TF.transpose(softmax_tensor_th, [0, 2, 3, 1])
         softmax_tensor_sum = TF.reduce_sum(softmax_tensor, [1, 2])
         softmax_tensor_sum = TF.expand_dims(TF.expand_dims(softmax_tensor_sum, 1), 1)
