@@ -129,7 +129,7 @@ def local_extract_frames_md(
             ret, frame = cap.read()
             if ret:
                 image = img_as_ubyte(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                img_name = str(output_path / "img" + str(index).zfill(indexlength) + ".png")
+                img_name = str(output_path / str("img" + str(index).zfill(indexlength) + ".png"))
                 if crop:
                     io.imsave(
                         img_name,
