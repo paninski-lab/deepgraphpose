@@ -79,7 +79,7 @@ trainingsetindex=0):
 
     # Load config.yaml and pose_cfg.yaml from dlcpath.
     dlc_base_path = Path(dlcpath)
-    config_path = dlc_base_path / 'config.yaml'
+    config_path = dlc_base_path / '/config.yaml'
     print('config_path', config_path)
     cfg = auxiliaryfunctions.read_config(config_path)
     modelfoldername = auxiliaryfunctions.GetModelFolder(

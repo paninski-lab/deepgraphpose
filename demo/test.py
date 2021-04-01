@@ -925,7 +925,7 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
 if __name__ == '__main__':
     # dlcpath = "/Users/sethdonaldson/sourceCode/neuro/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal machine path
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
-    # dlcpath = base_path + "/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # axon path
+    # dlcpath = base_path + "/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal
     dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-03-29" # axon path
     shuffle = 1
     batch_size = 10
