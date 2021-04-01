@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+from deepgraphpose.models.fitdgp import fit_dlc
 
 import deeplabcut
 from deeplabcut.pose_estimation_tensorflow.config import load_config
@@ -934,6 +935,23 @@ if __name__ == '__main__':
     #
     # # tf.enable_eager_execution()
     print(dlcpath)
+
+    print(
+        '''
+        =====================
+        |                   |
+        |                   |
+        |    Running DLC    |
+        |                   |
+        |                   |
+        =====================
+        '''
+        , flush=True)
+    snapshot = 'resnet_v1_50.ckpt'
+    fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
+
+    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+
     fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size)
 
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
