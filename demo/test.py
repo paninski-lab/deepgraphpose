@@ -934,21 +934,21 @@ if __name__ == '__main__':
     # gm2, gm3 = 1, 3
     #
     # # tf.enable_eager_execution()
-    print(dlcpath)
-
-    print(
-        '''
-        =====================
-        |                   |
-        |                   |
-        |    Running DLC    |
-        |                   |
-        |                   |
-        =====================
-        '''
-        , flush=True)
-    snapshot = 'resnet_v1_50.ckpt'
-    fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
+    # print(dlcpath)
+    #
+    # print(
+    #     '''
+    #     =====================
+    #     |                   |
+    #     |                   |
+    #     |    Running DLC    |
+    #     |                   |
+    #     |                   |
+    #     =====================
+    #     '''
+    #     , flush=True)
+    # snapshot = 'resnet_v1_50.ckpt'
+    # fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
 
     snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
 
