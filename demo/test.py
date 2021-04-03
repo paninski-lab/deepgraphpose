@@ -926,7 +926,7 @@ if __name__ == '__main__':
     # dlcpath = "/Users/sethdonaldson/sourceCode/neuro/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal machine path
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
     # dlcpath = base_path + "/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal
-    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-03-29" # axon path
+    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-02" # axon path
     shuffle = 1
     batch_size = 10
     snapshot = 'snapshot-step0-final--0'
@@ -936,19 +936,19 @@ if __name__ == '__main__':
     # # tf.enable_eager_execution()
     print(dlcpath)
 
-    # print(
-    #     '''
-    #     =====================
-    #     |                   |
-    #     |                   |
-    #     |    Running DLC    |
-    #     |                   |
-    #     |                   |
-    #     =====================
-    #     '''
-    #     , flush=True)
-    # snapshot = 'resnet_v1_50.ckpt'
-    # fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
+    print(
+        '''
+        =====================
+        |                   |
+        |                   |
+        |    Running DLC    |
+        |                   |
+        |                   |
+        =====================
+        '''
+        , flush=True)
+    snapshot = 'resnet_v1_50.ckpt'
+    fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
 
     snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
 
