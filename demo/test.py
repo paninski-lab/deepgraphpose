@@ -963,7 +963,8 @@ if __name__ == '__main__':
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
     dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-02"  # axon path
 
-    snapshot = "snapshot-step2--22500"
+    # snapshot = "snapshot-step2--22500"
+    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
     snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
     cfg = auxiliaryfunctions.read_config(cfg_yaml)
 
