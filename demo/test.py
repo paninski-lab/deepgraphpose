@@ -968,7 +968,7 @@ def run():
     dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path
     shuffle = 1
     batch_size = 10
-    snapshot = 'snapshot-step0-final--0'
+    snapshot = 'snapshot-step2--11200'
     step = 2
     # gm2, gm3 = 1, 3
     #
@@ -994,6 +994,6 @@ def run():
     fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size, maxiters=50000)
 
 if __name__ == '__main__':
-    # run()
-    plot()
+    run()
+    # plot()
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
