@@ -925,11 +925,47 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
 
     return loss, total_loss, total_loss_visible, placeholders
 
+
+
+def plot():
+    global shuffle, snapshot, video_path
+    shuffle = 1
+    base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
+    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-02"  # axon path
+    # snapshot = "snapshot-step2--22500"
+    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+    snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
+    cfg = auxiliaryfunctions.read_config(cfg_yaml)
+    video_path = str(Path(dlcpath) / 'videos')
+    if not (os.path.exists(video_path)):
+        print(video_path + " does not exist!")
+        video_sets = list(cfg['video_sets'])
+    else:
+        video_sets = [
+            video_path + '/' + f for f in listdir(video_path)
+            if isfile(join(video_path, f)) and (
+                    f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find(
+                'mkv') > 0)
+        ]
+    for video_file in video_sets:
+        clip = VideoFileClip(str(video_file))
+        # if clip.duration > 1:
+        #     clip = clip.subclip(1)
+        video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.', 1)[0] + '.mp4'
+        print('\nwriting {}'.format(video_file_name))
+        clip.write_videofile(video_file_name)
+        output_dir = os.getcwd() + '/'
+        plot_dgp(video_file=str(video_file_name),
+                 output_dir=output_dir,
+                 proj_cfg_file=str(cfg_yaml),
+                 dgp_model_file=str(snapshot_path),
+                 shuffle=shuffle)
+
 def run():
     # dlcpath = "/Users/sethdonaldson/sourceCode/neuro/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal machine path
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
     # dlcpath = base_path + "/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal
-    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-02"  # axon path
+    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path
     shuffle = 1
     batch_size = 10
     snapshot = 'snapshot-step0-final--0'
@@ -957,42 +993,6 @@ def run():
 
     fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size)
 
-
 if __name__ == '__main__':
-    shuffle = 1
-    base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
-    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-02"  # axon path
-
-    # snapshot = "snapshot-step2--22500"
-    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
-    snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
-    cfg = auxiliaryfunctions.read_config(cfg_yaml)
-
-    video_path = str(Path(dlcpath) / 'videos')
-    if not (os.path.exists(video_path)):
-        print(video_path + " does not exist!")
-        video_sets = list(cfg['video_sets'])
-    else:
-        video_sets = [
-            video_path + '/' + f for f in listdir(video_path)
-            if isfile(join(video_path, f)) and (
-                    f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find(
-                'mkv') > 0)
-        ]
-
-
-    for video_file in video_sets:
-        clip = VideoFileClip(str(video_file))
-        # if clip.duration > 1:
-        #     clip = clip.subclip(1)
-        video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.', 1)[0] + '.mp4'
-        print('\nwriting {}'.format(video_file_name))
-        clip.write_videofile(video_file_name)
-        output_dir = os.getcwd() + '/'
-        plot_dgp(video_file=str(video_file_name),
-                 output_dir=output_dir,
-                 proj_cfg_file=str(cfg_yaml),
-                 dgp_model_file=str(snapshot_path),
-                 shuffle=shuffle)
-
+    run()
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
