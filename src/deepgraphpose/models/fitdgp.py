@@ -865,13 +865,13 @@ def fit_dgp(
             print('\n loss: ', loss_eval, flush=True)
 
         # save the distinct losses
-        epipolar_losses.append(loss_eval['epipolar_loss'])
         # epipolar_losses.append(0)
+        epipolar_losses.append(loss_eval['epipolar_loss'])
         vis_losses.append(loss_eval['visible_loss_pred'])
         hid_losses.append(loss_eval['hidden_loss_pred'])
         vis_loss_locref.append(loss_eval['visible_loss_locref'])
-        # ws_losses.append(loss_eval['ws_loss'])
-        ws_losses.append(0)
+        # ws_losses.append(0)
+        ws_losses.append(loss_eval['ws_loss'])
         total_losses.append(loss_eval['total_loss'])
 
         # Save snapshot
@@ -885,12 +885,15 @@ def fit_dgp(
                 #print('Storing model {}'.format(model_name))
                 saver.save(sess, model_name, global_step=0)
 
-    # write the losses to a csv file for further analysis
-    write_losses_to_csv(
-        [epipolar_losses, vis_losses, hid_losses, vis_loss_locref, ws_losses, total_losses],
-        ["epipolar loss", "visible loss", "hidden loss", "visible loss locref", "ws loss", "total loss"],
-        "./losses.csv"
-    )
+            # periodically save losses
+            # write the losses to a csv file for further analysis
+            write_losses_to_csv(
+                [epipolar_losses, vis_losses, hid_losses, vis_loss_locref, ws_losses, total_losses],
+                ["epipolar loss", "visible loss", "hidden loss", "visible loss locref", "ws loss", "total loss"],
+                "./losses.csv"
+            )
+
+
 
     time_end = time.time()
     print('Finished {} iterations\n'.format(it), flush=True)

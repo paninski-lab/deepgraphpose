@@ -991,7 +991,7 @@ def run():
 
     snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
 
-    fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size)
+    fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size, maxiters=50000)
 
 if __name__ == '__main__':
     run()
