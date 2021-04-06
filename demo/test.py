@@ -38,6 +38,8 @@ from deeplabcut.pose_estimation_tensorflow.nnet.pose_net import PoseNet, losses,
 
 from deepgraphpose.dataset import MultiDataset, coord2map
 from deepgraphpose.models.fitdgp_util import gen_batch, argmax_2d_from_cm, combine_all_marker, build_aug, data_aug, learn_wt
+from deepgraphpose.models.eval import plot_dgp
+from deepgraphpose.models.fitdgp_util import get_snapshot_path
 
 
 vers = tf.__version__.split('.')
@@ -922,11 +924,11 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
 
     return loss, total_loss, total_loss_visible, placeholders
 
-if __name__ == '__main__':
+def run():
     # dlcpath = "/Users/sethdonaldson/sourceCode/neuro/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal machine path
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
     # dlcpath = base_path + "/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal
-    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-02" # axon path
+    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-02"  # axon path
     shuffle = 1
     batch_size = 10
     snapshot = 'snapshot-step0-final--0'
@@ -953,5 +955,37 @@ if __name__ == '__main__':
     snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
 
     fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size)
+
+
+if __name__ == '__main__':
+    shuffle = 1
+    base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
+    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-02"  # axon path
+
+    snapshot = "snapshot-step2--22500"
+    snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
+    cfg = auxiliaryfunctions.read_config(cfg_yaml)
+
+    video_path = str(Path(dlcpath) / 'videos_dgp')
+    if not (os.path.exists(video_path)):
+        print(video_path + " does not exist!")
+        video_sets = list(cfg['video_sets'])
+
+
+    for video_file in [video_sets[0]]:
+        from moviepy.editor import VideoFileClip
+
+        clip = VideoFileClip(str(video_file))
+        if clip.duration > 10:
+            clip = clip.subclip(10)
+        video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.', 1)[0] + '.mp4'
+        print('\nwriting {}'.format(video_file_name))
+        clip.write_videofile(video_file_name)
+        output_dir = os.getcwd() + '/'
+        plot_dgp(video_file=str(video_file_name),
+                 output_dir=output_dir,
+                 proj_cfg_file=str(cfg_yaml),
+                 dgp_model_file=str(snapshot_path),
+                 shuffle=shuffle)
 
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
