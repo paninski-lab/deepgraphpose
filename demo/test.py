@@ -40,6 +40,7 @@ from deepgraphpose.dataset import MultiDataset, coord2map
 from deepgraphpose.models.fitdgp_util import gen_batch, argmax_2d_from_cm, combine_all_marker, build_aug, data_aug, learn_wt
 from deepgraphpose.models.eval import plot_dgp
 from deepgraphpose.models.fitdgp_util import get_snapshot_path
+from moviepy.editor import VideoFileClip
 
 
 vers = tf.__version__.split('.')
@@ -966,18 +967,23 @@ if __name__ == '__main__':
     snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
     cfg = auxiliaryfunctions.read_config(cfg_yaml)
 
-    video_path = str(Path(dlcpath) / 'videos_dgp')
+    video_path = str(Path(dlcpath) / 'videos')
     if not (os.path.exists(video_path)):
         print(video_path + " does not exist!")
         video_sets = list(cfg['video_sets'])
+    else:
+        video_sets = [
+            video_path + '/' + f for f in listdir(video_path)
+            if isfile(join(video_path, f)) and (
+                    f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find(
+                'mkv') > 0)
+        ]
 
 
-    for video_file in [video_sets[0]]:
-        from moviepy.editor import VideoFileClip
-
+    for video_file in video_sets:
         clip = VideoFileClip(str(video_file))
-        if clip.duration > 10:
-            clip = clip.subclip(10)
+        # if clip.duration > 1:
+        #     clip = clip.subclip(1)
         video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.', 1)[0] + '.mp4'
         print('\nwriting {}'.format(video_file_name))
         clip.write_videofile(video_file_name)
