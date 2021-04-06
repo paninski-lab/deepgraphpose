@@ -870,8 +870,8 @@ def fit_dgp(
         vis_losses.append(loss_eval['visible_loss_pred'])
         hid_losses.append(loss_eval['hidden_loss_pred'])
         vis_loss_locref.append(loss_eval['visible_loss_locref'])
-        # ws_losses.append(0)
-        ws_losses.append(loss_eval['ws_loss'])
+        ws_losses.append(0)
+        # ws_losses.append(loss_eval['ws_loss'])
         total_losses.append(loss_eval['total_loss'])
 
         # Save snapshot
