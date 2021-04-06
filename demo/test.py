@@ -931,9 +931,9 @@ def plot():
     global shuffle, snapshot, video_path
     shuffle = 1
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
-    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-02"  # axon path
-    # snapshot = "snapshot-step2--22500"
-    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path
+    snapshot = "snapshot-step2--11200"
+    # snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
     snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
     cfg = auxiliaryfunctions.read_config(cfg_yaml)
     video_path = str(Path(dlcpath) / 'videos')
@@ -994,5 +994,6 @@ def run():
     fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size, maxiters=50000)
 
 if __name__ == '__main__':
-    run()
+    # run()
+    plot()
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
