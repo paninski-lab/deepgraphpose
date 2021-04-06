@@ -968,28 +968,28 @@ def run():
     dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path
     shuffle = 1
     batch_size = 10
-    snapshot = 'snapshot-step2--11200'
     step = 2
     # gm2, gm3 = 1, 3
     #
     # # tf.enable_eager_execution()
     # print(dlcpath)
     #
-    print(
-        '''
-        =====================
-        |                   |
-        |                   |
-        |    Running DLC    |
-        |                   |
-        |                   |
-        =====================
-        '''
-        , flush=True)
-    snapshot = 'resnet_v1_50.ckpt'
-    fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
+    # print(
+    #     '''
+    #     =====================
+    #     |                   |
+    #     |                   |
+    #     |    Running DLC    |
+    #     |                   |
+    #     |                   |
+    #     =====================
+    #     '''
+    #     , flush=True)
+    # snapshot = 'resnet_v1_50.ckpt'
+    # fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
 
-    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+    # snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+    snapshot = 'snapshot-step2--11200'
 
     fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size, maxiters=200000)
 
