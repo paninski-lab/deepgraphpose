@@ -41,6 +41,7 @@ from deepgraphpose.models.fitdgp_util import gen_batch, argmax_2d_from_cm, combi
 from deepgraphpose.models.eval import plot_dgp
 from deepgraphpose.models.fitdgp_util import get_snapshot_path
 from moviepy.editor import VideoFileClip
+from matplotlib import pyplot as plt
 
 
 vers = tf.__version__.split('.')
@@ -988,12 +989,15 @@ def run():
     # snapshot = 'resnet_v1_50.ckpt'
     # fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
 
-    # snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
-    snapshot = 'snapshot-step2--11200'
+    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+    # snapshot = 'snapshot-step2--11200'
 
     fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size, maxiters=200000)
 
 if __name__ == '__main__':
-    # run()
-    plot()
+    run()
+    # plot()
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
+
+
+
