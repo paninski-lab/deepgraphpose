@@ -132,7 +132,7 @@ if __name__ == '__main__':
         type=int,
         default=10,
         help="size of the batch, if there are memory issues, decrease it value")
-    parser.add_argument("--test", action='store_true', default=True)
+    parser.add_argument("--test", action='store_true', default=False)
 
     input_params = parser.parse_known_args()[0]
     print(input_params)
@@ -180,32 +180,32 @@ if __name__ == '__main__':
             snapshot = dlcsnapshot  # snapshot for step 1
 
         # %% step 1 DGP labeled frames only
-        # print(
-        #     '''
-        #     ===============================================
-        #     |                                             |
-        #     |                                             |
-        #     |    Running DGP with labeled frames only     |
-        #     |                                             |
-        #     |                                             |
-        #     ===============================================
-        #     '''
-        #     , flush=True)
-        #
-        # if test:
-        #     fit_dgp_labeledonly(snapshot,
-        #                         dlcpath,
-        #                         shuffle=shuffle,
-        #                         step=1,
-        #                         maxiters=2,
-        #                         displayiters=1)
-        # else:
-        #     fit_dgp_labeledonly(snapshot,
-        #                         dlcpath,
-        #                         shuffle=shuffle,
-        #                         step=1)
-        #
-        # snapshot = 'snapshot-step1-final--0'
+        print(
+            '''
+            ===============================================
+            |                                             |
+            |                                             |
+            |    Running DGP with labeled frames only     |
+            |                                             |
+            |                                             |
+            ===============================================
+            '''
+            , flush=True)
+
+        if test:
+            fit_dgp_labeledonly(snapshot,
+                                dlcpath,
+                                shuffle=shuffle,
+                                step=1,
+                                maxiters=2,
+                                displayiters=1)
+        else:
+            fit_dgp_labeledonly(snapshot,
+                                dlcpath,
+                                shuffle=shuffle,
+                                step=1)
+
+        snapshot = 'snapshot-step1-final--0'
         # %% step 2 DGP
         print(
             '''
