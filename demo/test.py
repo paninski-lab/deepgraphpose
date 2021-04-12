@@ -35,6 +35,7 @@ from deeplabcut.pose_estimation_tensorflow.train import LearningRate, get_batch_
 from deeplabcut.utils import auxiliaryfunctions
 from deeplabcut.pose_estimation_tensorflow.nnet.pose_net import PoseNet, losses, \
     prediction_layer
+import cv2 as cv
 
 from deepgraphpose.dataset import MultiDataset, coord2map
 from deepgraphpose.models.fitdgp_util import gen_batch, argmax_2d_from_cm, combine_all_marker, build_aug, data_aug, learn_wt
@@ -49,7 +50,6 @@ if int(vers[0]) == 1 and int(vers[1]) > 12:
     TF = tf.compat.v1
 else:
     TF = tf
-#
 #
 # def get_img_points(df, img_name):
 #     img_lbls = df.loc[df['scorer'] == img_name]
@@ -81,7 +81,7 @@ else:
 #         img1 = cv.circle(img1,tuple(pt1),5,color,-1)
 #         img2 = cv.circle(img2,tuple(pt2),5,color,-1)
 #     return img1, img2
-#
+# #
 # def run_test_numpy(dlcpath, shuffle, batch_size, snapshot):
 #     img1_name = "labeled-data/lBack_bodyCrop/img019942.png"
 #     img1 = cv.imread("/Users/sethdonaldson/sourceCode/neuro/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01/%s" % img1_name)
@@ -100,7 +100,6 @@ else:
 #     im1_pts = get_img_points(df, img1_name)
 #     im2_pts = get_img_points(df, img2_name)
 #
-#     # Now you can knock yourself out writing the loss function
 #     # compute fundamental matrix
 #     # todo: note a minimum of 8 corresponding points are needed
 #     F, mask = cv.findFundamentalMat(im1_pts, im2_pts)
@@ -144,23 +143,7 @@ else:
 #
 #     print("here")
 #
-#     # Find epilines corresponding to points in right image (second image) and
-#     # drawing its lines on left image
-#     lines1 = cv.computeCorrespondEpilines(im2_pts.reshape(-1, 1, 2), 2, F)
-#     lines1 = lines1.reshape(-1, 3)
-#     img5, img6 = drawlines(np.copy(img1), np.copy(img2), lines1, im1_pts, im2_pts)
-#     # Find epilines corresponding to points in left image (first image) and
-#     # drawing its lines on right image
-#     lines2 = cv.computeCorrespondEpilines(im1_pts.reshape(-1, 1, 2), 1, F)
-#     lines2 = lines2.reshape(-1, 3)
-#     img3, img4 = drawlines(np.copy(img2), np.copy(img1), lines2, im2_pts, im1_pts)
-#     plt.subplot(121), plt.imshow(img4)
-#     plt.subplot(122), plt.imshow(img3)
-#     plt.show()
-#     plt.subplot(121), plt.imshow(img6)
-#     plt.subplot(122), plt.imshow(img5)
-#     plt.show()
-#
+#     show_imgs_with_lines(F, im1_pts, im2_pts, img1, img2)
 #
 #     # todo: convert labels to heatmaps (how?)
 #     # Construct Gaussian targets for all markers
@@ -210,6 +193,35 @@ else:
 #     #         gm3=gm3)
 #
 #
+# def show_imgs_with_lines(F, im1_pts, im2_pts, img1, img2):
+#     """
+#     params:
+#         F: fundamental matrix between two views
+#         im1_pts, im2_pts: corresponding points from images 1 and 2
+#         img1: image from view 1
+#         img2: image from view 2
+#     returns:
+#         None
+#     """
+#     # Find epilines corresponding to points in right image (second image) and
+#     # drawing its lines on left image
+#     lines1 = cv.computeCorrespondEpilines(im2_pts.reshape(-1, 1, 2), 2, F)
+#     lines1 = lines1.reshape(-1, 3)
+#     img5, img6 = drawlines(np.copy(img1), np.copy(img2), lines1, im1_pts, im2_pts)
+#     # Find epilines corresponding to points in left image (first image) and
+#     # drawing its lines on right image
+#     lines2 = cv.computeCorrespondEpilines(im1_pts.reshape(-1, 1, 2), 1, F)
+#     lines2 = lines2.reshape(-1, 3)
+#     img3, img4 = drawlines(np.copy(img2), np.copy(img1), lines2, im2_pts, im1_pts)
+#     plt.subplot(121), plt.imshow(img4)
+#     plt.subplot(122), plt.imshow(img3)
+#     plt.show()
+#     plt.subplot(121), plt.imshow(img6)
+#     plt.subplot(122), plt.imshow(img5)
+#     plt.show()
+
+
+#
 # def run_test_tf(dlcpath, shuffle, batch_size, snapshot):
 #     img1_name = "labeled-data/lBack_bodyCrop/img019942.png"
 #     img1 = cv.imread("/Users/sethdonaldson/sourceCode/neuro/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01/%s" % img1_name)
@@ -257,6 +269,7 @@ else:
 #     print(z)
 #     print(loss)
 #
+
 def fit_dgp_eager(
         snapshot, dlcpath, batch_size=10, shuffle=1, step=2, saveiters=1000, displayiters=5,
         maxiters=200000, ns=10, nc=2048, n_max_frames=2000, gm2=0, gm3=0, nepoch=100, wt=0, aug=True,
@@ -928,12 +941,10 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
 
 
 
-def plot():
-    global shuffle, snapshot, video_path
+def plot(snapshot, dlc_path_local):
     shuffle = 1
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
-    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path
-    snapshot = "snapshot-step2-final--0"
+    dlcpath = base_path + dlc_path_local
     # snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
     snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
     cfg = auxiliaryfunctions.read_config(cfg_yaml)
@@ -962,11 +973,12 @@ def plot():
                  dgp_model_file=str(snapshot_path),
                  shuffle=shuffle)
 
-def run():
+
+def run(snapshot, dlc_path_local, multiview):
     # dlcpath = "/Users/sethdonaldson/sourceCode/neuro/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal machine path
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
     # dlcpath = base_path + "/deepgraphpose/data/track_graph3d/bird1-selmaan-2030-01-01" # personal
-    dlcpath = base_path + "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path
+    dlcpath = base_path + dlc_path_local
     shuffle = 1
     batch_size = 10
     step = 2
@@ -989,14 +1001,17 @@ def run():
     # snapshot = 'resnet_v1_50.ckpt'
     # fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
 
-    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
     # snapshot = 'snapshot-step2--11200'
 
-    fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size, maxiters=200000)
+    fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size, maxiters=200000, multiview=multiview)
 
 if __name__ == '__main__':
-    # run()
-    plot()
+    dlc_path_local = "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path
+    # snapshot = "snapshot-step2-final--0"
+    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+
+    run(snapshot, dlc_path_local, True)
+    plot(snapshot, dlc_path_local)
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
 
 

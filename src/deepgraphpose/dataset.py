@@ -819,10 +819,11 @@ class Dataset:
 
 class MultiDataset:
 
-    def __init__(self, config_yaml, video_sets=None, shuffle=None, S0=None, multiview=True):
+    def __init__(self, config_yaml, video_sets=None, shuffle=None, S0=None, multiview=False):
 
         self.datasets = []
         self.paths = {}
+        self.multiview = multiview
 
         # load dataset config
         from deepgraphpose.utils_model import get_train_config
@@ -872,7 +873,7 @@ class MultiDataset:
 
         self.curr_batch = 0  # keep track of batches served per schedule
 
-        if multiview:
+        if self.multiview:
             self.compute_fundamental_matrices()
 
     # Creates a dict of {dataset1name_dataset2name : FundamentalMatrix}
@@ -891,7 +892,7 @@ class MultiDataset:
             num_pts_per_frame = lbls[1].shape[0]
             num_frames = len(idxs)
             sorted_points = np.zeros(shape=(num_frames*num_pts_per_frame, 2))
-            for i, idx in enumerate(sorted_idxs): # todo: might break
+            for i, idx in enumerate(sorted_idxs):
                 pts = idx_lbl_dict[idx]
                 insertion_idx = i * num_pts_per_frame
                 sorted_points[insertion_idx:insertion_idx+num_pts_per_frame] = pts
