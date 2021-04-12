@@ -80,8 +80,6 @@ trainingsetindex=0):
     # Load config.yaml and pose_cfg.yaml from dlcpath.
     dlc_base_path = Path(dlcpath)
     config_path = dlcpath + '/config.yaml'
-    print('dlcpath', dlcpath)
-    print('base path', dlc_base_path)
     print('config_path', config_path)
     cfg = auxiliaryfunctions.read_config(config_path)
     modelfoldername = auxiliaryfunctions.GetModelFolder(
@@ -115,7 +113,7 @@ trainingsetindex=0):
     model_name = dlc_cfg.snapshot_prefix + '-step0-final--0.index'
     if os.path.isfile(model_name):
         print(model_name, '  exists! The original DLC has already been run.', flush=True)
-        # return None
+        return None
 
     # Build loss function
     TF.reset_default_graph()
@@ -363,7 +361,7 @@ def fit_dgp_labeledonly(
     model_name = dgp_cfg.snapshot_prefix + '-step1-final--0.index'
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP with labeled frames has already been run.', flush=True)
-        # return None
+        return None
 
     # create training data - find good hidden frames
     snapshot = 0
@@ -672,7 +670,7 @@ def fit_dgp(
     model_name = dgp_cfg.snapshot_prefix + '-step{}{}-final--0.index'.format(step, debug)
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP has already been run.', flush=True)
-        # return None
+        return None
 
     # create training data - find good hidden frames
     snapshot = 0
@@ -853,8 +851,7 @@ def fit_dgp(
         start_time00 = time.time()
         [loss_eval, _] = sess.run([loss, train_op], feed_dict)
         end_time00 = time.time()
-        # if it % displayiters == 0 and it > 0:
-        if it >= 0:
+        if it % displayiters == 0 and it > 0:
             print('\nIteration {}/{}'.format(it, maxiters))
 
             print('dataset_i: ', dataset_i, flush=True)
@@ -865,14 +862,12 @@ def fit_dgp(
             print('\n loss: ', loss_eval, flush=True)
 
         # save the distinct losses
-        # epipolar_losses.append(0)
-        epipolar_losses.append(loss_eval['epipolar_loss'])
-        vis_losses.append(loss_eval['visible_loss_pred'])
-        hid_losses.append(loss_eval['hidden_loss_pred'])
-        vis_loss_locref.append(loss_eval['visible_loss_locref'])
-        ws_losses.append(0)
-        # ws_losses.append(loss_eval['ws_loss'])
-        total_losses.append(loss_eval['total_loss'])
+        epipolar_losses.append(loss_eval['epipolar_loss'] if 'epipolar_loss' in loss_eval else None)
+        vis_losses.append(loss_eval['visible_loss_pred'] if 'visible_loss_pred' in loss_eval else None)
+        hid_losses.append(loss_eval['hidden_loss_pred'] if 'hidden_loss_pred' in loss_eval else None)
+        vis_loss_locref.append(loss_eval['visible_loss_locref'] if 'visible_loss_locref' in loss_eval else None)
+        ws_losses.append(loss_eval['ws_loss'] if 'ws_loss' in loss_eval else None)
+        total_losses.append(loss_eval['total_loss'] if 'total_loss' in loss_eval else None)
 
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
@@ -902,7 +897,7 @@ def fit_dgp(
     return None
 
 # todo: this method is technically computing the predictions AND the loss. We should consider splitting this up into
-#       two separate functions for future use.
+#       two separate functions for future ease-of-use.
 def dgp_loss(data_batcher, dgp_cfg, placeholders):
     """Construct the loss for DGP.
     Parameters
@@ -1103,7 +1098,8 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
     targets_all_marker_3c = TF.reshape(targets_all_marker, [nt_batch_pl, nj, -1])  # targets_all_marker with 3 columns
     # # Epipolar clique
     # # todo: make this conditional based on whether or not training is "multiview"
-    # # todo: as it stands right now, I am not incorporating any hard labels, strictly constraining the predictions -> may be helpful to incorporate hard labels
+    # # todo: as it stands right now, I am not incorporating any hard labels, strictly constraining the predictions
+    #         e.g. if labels are provided for frame x in view 1, compute reprojection error on frame x in view 2 using the hard labels (may or may not be worthwhile)
     # # todo: consider scaling loss by confidence of prediction?
     # # todo: need a weight for the clique?
     F_dict = data_batcher.fundamental_mat_dict
@@ -1197,8 +1193,15 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
     return loss, total_loss, total_loss_visible
 
 
-# todo: write docstring
 def define_placeholders(nj):
+    """ Defines placeholder values used in dgp_loss
+    Parameters
+    ----------
+    nj :
+    Returns
+    -------
+    a dictionary of placeholder values to be used in dgp_loss
+    """
     # Define placeholders
     # input and output
     inputs = TF.placeholder(TF.float32, shape=[None, None, None, 3])
@@ -1244,6 +1247,16 @@ def define_placeholders(nj):
 
 # todo: write docstring
 def compute_epipolar_loss(v1_pts, v2_pts, F):
+    """ Computes epipolar loss between two given sets of corresponding points and a fundamental matrix F, as ||x'Fx||
+    Parameters
+    ----------
+    v1_pts : a list of points from corresponding frames in view 1
+    v2_pts : a list of points from corresponding frames in view 2
+    F : Fundamental matrix between views 1 and 2
+    Returns
+    -------
+    scalar loss value of ||x'Fx||, the magnitude of the vector v2_pts•F•v1_pts
+    """
     # convert to homogeneous coordinates
     ones = tf.ones_like(v1_pts)[:,0]
     ones = tf.expand_dims(ones, axis=1)
@@ -1277,5 +1290,4 @@ def write_losses_to_csv(all_losses_list, loss_names, path):
 
     # save losses to csv
     all_losses_df.to_csv(path)
-
 
