@@ -1010,7 +1010,7 @@ if __name__ == '__main__':
     # snapshot = "snapshot-step2-final--0"
     snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
 
-    run(snapshot, dlc_path_local, True)
+    run(snapshot, dlc_path_local, False)
     plot(snapshot, dlc_path_local)
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
 
