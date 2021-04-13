@@ -941,7 +941,7 @@ def dgp_loss_eager(data_batcher, dgp_cfg, feed_dict):
 
 
 
-def plot(snapshot, dlc_path_local):
+def plot(snapshot, dlc_path_local, name=''):
     shuffle = 1
     base_path = os.getcwd()[:os.getcwd().find("deepgraphpose")]
     dlcpath = base_path + dlc_path_local
@@ -949,6 +949,7 @@ def plot(snapshot, dlc_path_local):
     snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
     cfg = auxiliaryfunctions.read_config(cfg_yaml)
     video_path = str(Path(dlcpath) / 'videos')
+
     if not (os.path.exists(video_path)):
         print(video_path + " does not exist!")
         video_sets = list(cfg['video_sets'])
@@ -963,7 +964,7 @@ def plot(snapshot, dlc_path_local):
         clip = VideoFileClip(str(video_file))
         # if clip.duration > 1:
         #     clip = clip.subclip(1)
-        video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.', 1)[0] + '.mp4'
+        video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.', 1)[0] + name + '.mp4'
         print('\nwriting {}'.format(video_file_name))
         clip.write_videofile(video_file_name)
         output_dir = os.getcwd() + '/'
@@ -1008,10 +1009,11 @@ def run(snapshot, dlc_path_local, multiview):
 if __name__ == '__main__':
     dlc_path_local = "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path
     # snapshot = "snapshot-step2-final--0"
-    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+    # snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
 
-    run(snapshot, dlc_path_local, False)
-    plot(snapshot, dlc_path_local)
+    # run(snapshot, dlc_path_local, False)
+    plot('snapshot-step0-final--0', dlc_path_local, "dlc")
+    plot('snapshot-step2-final--0', dlc_path_local, "dgp_sans_epipolar")
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
 
 
