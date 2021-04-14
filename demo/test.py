@@ -1012,8 +1012,8 @@ if __name__ == '__main__':
     # snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
 
     # run(snapshot, dlc_path_local, False)
-    plot('snapshot-step0-final--0', dlc_path_local, "dlc")
-    plot('snapshot-step2-final--0', dlc_path_local, "dgp_sans_epipolar")
+    # plot('snapshot-step0-final--0', dlc_path_local, "dlc")
+    plot('snapshot-step2-final--0', dlc_path_local, "")
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
 
 

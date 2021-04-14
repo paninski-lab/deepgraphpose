@@ -1097,7 +1097,6 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
     # ------------------------------------------------------------------------------------
     targets_all_marker_3c = TF.reshape(targets_all_marker, [nt_batch_pl, nj, -1])  # targets_all_marker with 3 columns
     # # Epipolar clique
-    # # todo: make this conditional based on whether or not training is "multiview"
     # # todo: as it stands right now, I am not incorporating any hard labels, strictly constraining the predictions
     #         e.g. if labels are provided for frame x in view 1, compute reprojection error on frame x in view 2 using the hard labels (may or may not be worthwhile)
     # # todo: consider scaling loss by confidence of prediction?
