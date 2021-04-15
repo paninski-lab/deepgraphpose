@@ -256,7 +256,7 @@ trainingsetindex=0):
 
 def fit_dgp_labeledonly(
         snapshot, dlcpath, shuffle=1, step=1, saveiters=1000, displayiters=5, maxiters=50000,
-        ns=10, nc=2048, n_max_frames=2000, aug=True,trainingsetindex=0):
+        ns=10, nc=2048, n_max_frames=2000, aug=True,trainingsetindex=0, multiview=False):
     """Run the DGP with labeled frames only.
     Parameters
     ----------
@@ -337,7 +337,8 @@ def fit_dgp_labeledonly(
     data_batcher = MultiDataset(config_yaml=config_path,
                                 video_sets=video_sets,
                                 shuffle=shuffle,
-                                S0=S0)
+                                S0=S0,
+                                multiview=multiview)
     dgp_cfg = data_batcher.dlc_config
     dgp_cfg.ws = 0  # the spatial clique parameter
     dgp_cfg.ws_max = 1.2  # the multiplier for the upper bound of spatial distance

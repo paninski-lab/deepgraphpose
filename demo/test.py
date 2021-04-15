@@ -5,6 +5,7 @@ import tensorflow as tf
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 from deepgraphpose.models.fitdgp import fit_dgp
+from deepgraphpose.models.fitdgp import fit_dgp_labeledonly
 from deepgraphpose.models.fitdgp import compute_epipolar_loss
 from deepgraphpose.models.fitdgp import dgp_loss
 from deepgraphpose.models.fitdgp import define_placeholders
@@ -1003,17 +1004,22 @@ def run(snapshot, dlc_path_local, multiview):
     # fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
 
     # snapshot = 'snapshot-step2--11200'
+    # Without epipolar
+    fit_dgp_labeledonly('snapshot-step0-final--0', dlcpath, shuffle=shuffle, step=1, maxiters=200000, multiview=False)
+    fit_dgp('snapshot-step1-final--0', dlcpath, shuffle=shuffle, step=2, batch_size=batch_size, maxiters=200000, multiview=False)
 
-    fit_dgp(snapshot, dlcpath, shuffle=shuffle, step=step, batch_size=batch_size, maxiters=200000, multiview=multiview)
+    # With Epipolar
+    fit_dgp_labeledonly('snapshot-step0-final--0', dlcpath, shuffle=shuffle, step=3, maxiters=200000, multiview=True)
+    fit_dgp('snapshot-step3-final--0', dlcpath, shuffle=shuffle, step=4, batch_size=batch_size, maxiters=200000, multiview=True)
 
 if __name__ == '__main__':
     dlc_path_local = "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path
     # snapshot = "snapshot-step2-final--0"
-    # snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+    snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
 
-    # run(snapshot, dlc_path_local, False)
+    run(snapshot, dlc_path_local, False)
     # plot('snapshot-step0-final--0', dlc_path_local, "dlc")
-    plot('snapshot-step2-final--0', dlc_path_local, "")
+    # plot('snapshot-step2-final--0', dlc_path_local, "")
     # run_test_numpy(dlcpath, shuffle, batch_size, snapshot)
 
 
