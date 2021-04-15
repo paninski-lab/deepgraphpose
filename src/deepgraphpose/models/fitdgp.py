@@ -446,8 +446,14 @@ def fit_dgp_labeledonly(
     print('Begin Training for {} iterations'.format(maxiters))
     if dgp_cfg.aug:
         pipeline = build_aug(apply_prob=0.8)
-    time_start = time.time()
 
+    time_start = time.time()
+    epipolar_losses = []
+    vis_losses = []
+    hid_losses = []
+    vis_loss_locref = []
+    ws_losses = []
+    total_losses = []
     for it in range(maxiters):
 
         current_lr = dgp_cfg.lr
@@ -479,6 +485,8 @@ def fit_dgp_labeledonly(
             all_data_batch_ids.append(all_data_batch)
             # add the corresponding name of the view to a list of video_names (important that these added at the same time to their respective lists to preserve ordering)
             video_names.append(data_batcher.datasets[dataset_id].video_name)
+        # make all_data_batch_ids a single ndarray
+        all_data_batch_ids = np.concatenate(all_data_batch_ids)
 
         nt_batch = len(visible_frame) + len(hidden_frame)
         visible_marker, hidden_marker, visible_marker_in_targets = addn_batch_info
@@ -517,7 +525,7 @@ def fit_dgp_labeledonly(
         alpha = np.array([xg, yg]).swapaxes(1, 2)  # 2 x nx_out x ny_out
 
         feed_dict = {
-            placeholders['inputs']: all_data_batch,
+            placeholders['inputs']: all_data_batch_ids,
             placeholders['targets']: joint_loc,
             placeholders['locref_map']: locref_targets_all_batch,
             placeholders['locref_mask']: locref_mask_all_batch,
@@ -546,6 +554,14 @@ def fit_dgp_labeledonly(
             print('\n running time: ', end_time00 - start_time00, flush=True)
             print('\n loss: ', loss_eval, flush=True)
 
+        # save the distinct losses # todo: make this a method which writes to a dataframe (less lines of code)
+        epipolar_losses.append(loss_eval['epipolar_loss'] if 'epipolar_loss' in loss_eval else None)
+        vis_losses.append(loss_eval['visible_loss_pred'] if 'visible_loss_pred' in loss_eval else None)
+        hid_losses.append(loss_eval['hidden_loss_pred'] if 'hidden_loss_pred' in loss_eval else None)
+        vis_loss_locref.append(loss_eval['visible_loss_locref'] if 'visible_loss_locref' in loss_eval else None)
+        ws_losses.append(loss_eval['ws_loss'] if 'ws_loss' in loss_eval else None)
+        total_losses.append(loss_eval['total_loss'] if 'total_loss' in loss_eval else None)
+
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
             model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-'
@@ -554,6 +570,14 @@ def fit_dgp_labeledonly(
             if (it + 1) == maxiters:
                 model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-final-'
                 saver.save(sess, model_name, global_step=0)
+
+            # periodically save losses
+            # write the losses to a csv file for further analysis
+            write_losses_to_csv(
+                [epipolar_losses, vis_losses, hid_losses, vis_loss_locref, ws_losses, total_losses],
+                ["epipolar loss", "visible loss", "hidden loss", "visible loss locref", "ws loss", "total loss"],
+                "./losses_labeledonly.csv"
+            )
 
     time_end = time.time()
     print('Finished training {} iterations\n'.format(it), flush=True)
