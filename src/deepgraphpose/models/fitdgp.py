@@ -530,6 +530,7 @@ def fit_dgp_labeledonly(
             placeholders['wt_batch_pl']: wt_batch,
             placeholders['alpha_tf']: alpha,
             learning_rate: current_lr,
+            placeholders['video_names']: video_names
         }
 
         start_time00 = time.time()
