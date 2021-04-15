@@ -1008,11 +1008,11 @@ def run(snapshot, dlc_path_local, multiview):
     # fit_dgp_labeledonly('snapshot-step0-final--0', dlcpath, shuffle=shuffle, step=1, maxiters=200000, multiview=False)
     # fit_dgp('snapshot-step1-final--0', dlcpath, shuffle=shuffle, step=2, batch_size=batch_size, maxiters=200000, multiview=False)
 
-    plot('snapshot-step2-final--0', dlc_path_local, "_epi0_")
+    # plot('snapshot-step2-final--0', dlc_path_local, "_epi0_")
     # With Epipolar
     fit_dgp_labeledonly('snapshot-step0-final--0', dlcpath, shuffle=shuffle, step=3, maxiters=200000, multiview=True)
     fit_dgp('snapshot-step3-final--0', dlcpath, shuffle=shuffle, step=4, batch_size=batch_size, maxiters=200000, multiview=True)
-    plot('snapshot-step4-final--0', dlc_path_local, "_epi1_")
+    plot('snapshot-step4-final--0', dlc_path_local, "_epi1")
 
 if __name__ == '__main__':
     dlc_path_local = "/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05"  # axon path

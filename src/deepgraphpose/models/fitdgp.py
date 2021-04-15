@@ -1222,8 +1222,7 @@ def define_placeholders(nj):
 
     wt_batch_pl = TF.placeholder(TF.float32, shape=[None,])  # placeholder for the temporal clique wt; it's a vector which can contain different clique values for different frames
     wt_batch_mask_pl = TF.placeholder(TF.float32, shape=[None,])  # placeholder for the batch mask for wt, 1 means wt is in the batch; 0 means wt is not in the batch
-    video_names = TF.placeholder(TF.string,
-                                 shape=[None])  # used in getting the appropiate views for computing epipolar loss
+    video_names = TF.placeholder(TF.string, shape=[None,])  # used in getting the appropiate views for computing epipolar loss
     alpha_tf = TF.placeholder(tf.float32, shape=[2, None, None], name="2dgrid")
     vector_field_tf = TF.placeholder(TF.float32, shape=[None, None, None])  # placeholder for the vector fields
 
