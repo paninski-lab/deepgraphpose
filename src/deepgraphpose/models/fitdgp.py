@@ -476,6 +476,7 @@ def fit_dgp_labeledonly(
         # todo: this loop should be conditional based on how many videos are in the data_batcher?
         # todo: rewrite this to BE a part of the data_batcher?
         all_data_batch_ids = []
+        all_joint_locs = []
         video_names = []
         for dataset_id in range(len(data_batcher.datasets)):
             (visible_frame, hidden_frame, _, all_data_batch, joint_loc, wt_batch_mask,
@@ -483,10 +484,13 @@ def fit_dgp_labeledonly(
                 data_batcher.next_batch(0, dataset_id, visible_frame_batch_i, hidden_frame_batch_i)
             # add data from a single view to the batch
             all_data_batch_ids.append(all_data_batch)
+            all_joint_locs.append(joint_loc)
             # add the corresponding name of the view to a list of video_names (important that these added at the same time to their respective lists to preserve ordering)
             video_names.append(data_batcher.datasets[dataset_id].video_name)
+
         # make all_data_batch_ids a single ndarray
         all_data_batch_ids = np.concatenate(all_data_batch_ids)
+        all_joint_locs = np.concatenate(all_joint_locs)
 
         nt_batch = len(visible_frame) + len(hidden_frame)
         visible_marker, hidden_marker, visible_marker_in_targets = addn_batch_info
@@ -526,7 +530,7 @@ def fit_dgp_labeledonly(
 
         feed_dict = {
             placeholders['inputs']: all_data_batch_ids,
-            placeholders['targets']: joint_loc,
+            placeholders['targets']: all_joint_locs,
             placeholders['locref_map']: locref_targets_all_batch,
             placeholders['locref_mask']: locref_mask_all_batch,
             placeholders['visible_marker_pl']: visible_marker,
