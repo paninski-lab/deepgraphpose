@@ -107,7 +107,7 @@ if __name__ == '__main__':
             snapshot = dlcsnapshot  # snapshot for step 1
 
         # %% step 1 DGP labeled frames only
-        step = 1
+        step = start_step
         print_steps(step)
 
         fit_dgp_labeledonly(snapshot=snapshot,
@@ -122,7 +122,7 @@ if __name__ == '__main__':
         snapshot = 'snapshot-step{}-final--0'.format(step)
 
         # %% step 2 DGP
-        step = 2
+        step += 1
         print_steps(step)
         gm2, gm3 = 1, 3 # regularization constants
         fit_dgp(snapshot=snapshot,
