@@ -67,6 +67,7 @@ if __name__ == '__main__':
     test = input_params.test
     multiview = input_params.multiview
     start_step = input_params.start_step
+    epipolar_wt = input_params.epipolar_wt
 
     if test:  # we run for a short period
         maxiters_dgp = 10
@@ -116,7 +117,8 @@ if __name__ == '__main__':
                             saveiters=saveiters,
                             displayiters=displayiters,
                             maxiters=maxiters_dgp,
-                            multiview=multiview)
+                            multiview=multiview,
+                            epipolar_wt=epipolar_wt)
         snapshot = 'snapshot-step{}-final--0'.format(step)
 
         # %% step 2 DGP
@@ -133,7 +135,8 @@ if __name__ == '__main__':
                 displayiters=displayiters,
                 gm2=gm2,
                 gm3=gm3,
-                multiview=multiview)
+                multiview=multiview,
+                epipolar_wt=epipolar_wt)
 
         snapshot = 'snapshot-step{}-final--0'.format(step)
 

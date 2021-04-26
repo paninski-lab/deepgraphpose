@@ -256,7 +256,7 @@ trainingsetindex=0):
 
 def fit_dgp_labeledonly(
         snapshot, dlcpath, shuffle=1, step=1, saveiters=1000, displayiters=5, maxiters=50000,
-        ns=10, nc=2048, n_max_frames=2000, aug=True,trainingsetindex=0, multiview=False):
+        ns=10, nc=2048, n_max_frames=2000, aug=True,trainingsetindex=0, multiview=False, epipolar_wt=1):
     """Run the DGP with labeled frames only.
     Parameters
     ----------
@@ -344,6 +344,7 @@ def fit_dgp_labeledonly(
     dgp_cfg.ws_max = 1.2  # the multiplier for the upper bound of spatial distance
     dgp_cfg.wt = 0  # the temporal clique parameter
     dgp_cfg.wt_max = 0  # the upper bound of temporal distance
+    dgp_cfg.epipolar_wt = epipolar_wt  # the weight for the epipolar loss
     dgp_cfg.wn_visible = 1  # the network clique parameter for visible frames
     dgp_cfg.wn_hidden = 0  # the network clique parameter for hidden frames
     dgp_cfg.gamma = 1  # the multiplier for the softmax confidence map
@@ -593,7 +594,7 @@ def fit_dgp_labeledonly(
 def fit_dgp(
         snapshot, dlcpath, batch_size=10, shuffle=1, step=2, saveiters=1000, displayiters=5,
         maxiters=200000, ns=10, nc=2048, n_max_frames=2000, gm2=0, gm3=0, nepoch=100, wt=0, aug=True,
-        debug='', trainingsetindex=0, multiview=False):
+        debug='', trainingsetindex=0, multiview=False, epipolar_wt=1):
     """Run DGP.
     Parameters
     ----------
@@ -682,6 +683,7 @@ def fit_dgp(
     dgp_cfg.ws_max = 1.2  # the multiplier for the upper bound of spatial distance
     dgp_cfg.wt = wt  # the temporal clique parameter
     dgp_cfg.wt_max = 0  # the upper bound of temporal distance
+    dgp_cfg.epipolar_wt = epipolar_wt  # the weight for the epipolar loss
     dgp_cfg.wn_visible = 5  # the network clique parameter for visible frames
     dgp_cfg.wn_hidden = 3  # the network clique parameter for hidden frames
     dgp_cfg.gamma = 1  # the multiplier for the softmax confidence map
@@ -929,6 +931,7 @@ def fit_dgp(
 
     return None
 
+
 # todo: this method is technically computing the predictions AND the loss. We should consider splitting this up into
 #       two separate functions for future ease-of-use.
 def dgp_loss(data_batcher, dgp_cfg, placeholders):
@@ -1000,7 +1003,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
     ws_tf = TF.constant(ws, TF.float32)  # placeholder for the spatial clique ws; it varies across joints
     ws_max_tf = TF.constant(ws_max, TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
 
-    # Build the network # todo: why is this here? inside the loss function?
+    # Build the network # todo: why is this here? *Inside* the loss function?
     pn = PoseNet(dgp_cfg)
     net, end_points = pn.extract_features(inputs)
     scope = "pose"
@@ -1150,7 +1153,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
             # compute epipolar loss. (every point in v1_pts should correspond to the same point in space as the point at
             # the same index in v2_pts. I.e. v1_pts[n] and v2_pts[n] correspond to the same point in space)
             epipolar_loss = compute_epipolar_loss(v1_pts, v2_pts, F)
-            loss['epipolar_loss'] += epipolar_loss
+            loss['epipolar_loss'] += dgp_cfg.epipolar_wt * epipolar_loss
 
         total_loss += loss['epipolar_loss']
 
