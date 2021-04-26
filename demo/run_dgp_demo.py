@@ -152,6 +152,7 @@ if __name__ == '__main__':
         video_pred_path = set_or_open_folder(os.path.join(dlcpath, 'videos_pred'))
 
         if test: # analyze a short clip from one video
+            print('clipping one video for test.')
             short_video, _ = clip_video(video_sets[0], 10)
             video_sets = [short_video]
 

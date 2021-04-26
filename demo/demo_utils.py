@@ -139,8 +139,8 @@ def clip_video(video_file, crop_duration=10):
     from moviepy.editor import VideoFileClip
     clip = VideoFileClip(str(video_file))
     if clip.duration > crop_duration:
-        clip = clip.subclip(crop_duration)
-    video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.', 1)[0] + '.mp4'
+        clip = clip.subclip(t_start=0, t_end=crop_duration)
+    video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.', 1)[0] + '_short' + '.mp4'
     print('\nwriting {}'.format(video_file_name))
     clip.write_videofile(video_file_name)
     output_dir = os.getcwd() + '/'
