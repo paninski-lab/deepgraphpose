@@ -54,7 +54,7 @@ if __name__ == '__main__':
         help="size of the batch, if there are memory issues, decrease it value")
     parser.add_argument("--test", action='store_true', default=False)
     parser.add_argument("--multiview", action='store_true', default=False)
-    # consider changing
+    parser.add_argument("--epipolar_wt", type=float, default=1.0)
     parser.add_argument("--start_step", type=int, default=0,
                         help="0:dlc, 1:dgp_labeledonly, 2:dgp, 3:multiview labeled only, 4:dgp multiview ")
     input_params = parser.parse_known_args()[0]
