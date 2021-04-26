@@ -151,16 +151,16 @@ if __name__ == '__main__':
 
         video_pred_path = set_or_open_folder(os.path.join(dlcpath, 'videos_pred'))
 
+        if test: # analyze a short clip from one video
+            short_video, _ = clip_video(video_sets[0], 10)
+            video_sets = [short_video]
+
         for video_file in video_sets:
-            if test: # analyze a short clip from one video
-                video_file, _ = clip_video(video_file, 10)
             plot_dgp(video_file=str(video_file),
                      output_dir=str(video_pred_path),
                      proj_cfg_file=str(cfg_yaml),
                      dgp_model_file=str(snapshot_path),
                      shuffle=shuffle)
-            if test: # break after one video
-                break
 
     finally:
 
