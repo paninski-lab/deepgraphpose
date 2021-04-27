@@ -561,11 +561,11 @@ def fit_dgp_labeledonly(
 
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
-            model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-'
+            model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug) + '-'
             saver.save(sess, model_name, global_step=it)
             saver.save(sess, model_name, global_step=0)
             if (it + 1) == maxiters:
-                model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-final-'
+                model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug) + '-final-'
                 saver.save(sess, model_name, global_step=0)
 
             # Periodically save losses. Write the losses to a csv file for further analysis
