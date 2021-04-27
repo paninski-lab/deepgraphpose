@@ -256,7 +256,7 @@ trainingsetindex=0):
 
 def fit_dgp_labeledonly(
         snapshot, dlcpath, shuffle=1, step=1, saveiters=1000, displayiters=5, maxiters=50000,
-        ns=10, nc=2048, n_max_frames=2000, aug=True,trainingsetindex=0, multiview=False, epipolar_wt=1):
+        ns=10, nc=2048, n_max_frames=2000, aug=True, debug='', trainingsetindex=0, multiview=False, epipolar_wt=1):
     """Run the DGP with labeled frames only.
     Parameters
     ----------
@@ -571,7 +571,7 @@ def fit_dgp_labeledonly(
             # Periodically save losses. Write the losses to a csv file for further analysis
             if not os.path.exists('losses'):
                 os.makedirs('losses')
-            csv_path = './losses/step' + str(step) + '_it' + str(it) + '_losses.csv'
+            csv_path = './losses/step{}_it{}_{}_losses.csv'.format(step, it, debug)
             losses_df.to_csv(csv_path)
 
     time_end = time.time()
@@ -900,7 +900,7 @@ def fit_dgp(
             # Periodically save losses. Write the losses to a csv file for further analysis
             if not os.path.exists('losses'):
                 os.makedirs('losses')
-            csv_path = './losses/step' + str(step) + '_it' + str(it) + '_losses.csv'
+            csv_path = './losses/step{}_it{}_{}_losses.csv'.format(step, it, debug)
             losses_df.to_csv(csv_path)
 
     time_end = time.time()

@@ -55,7 +55,8 @@ if __name__ == '__main__':
     parser.add_argument("--test", action='store_true', default=False)
     parser.add_argument("--multiview", action='store_true', default=False)
     parser.add_argument("--epipolar_wt", type=float, default=1.0)
-    parser.add_argument("--start_step", type=int, default=0,
+    parser.add_argument("--debug", type=str, default='') # todo: come up with a better (more descriptive) name for this
+    parser.add_argument("--start_step", type=int, default=1,
                         help="0:dlc, 1:dgp_labeledonly, 2:dgp, 3:multiview labeled only, 4:dgp multiview ")
     input_params = parser.parse_known_args()[0]
     print(input_params)
@@ -68,6 +69,7 @@ if __name__ == '__main__':
     multiview = input_params.multiview
     start_step = input_params.start_step
     epipolar_wt = input_params.epipolar_wt
+    debug = input_params.debug
 
     if test:  # we run for a short period
         maxiters_dgp = 10
@@ -118,7 +120,8 @@ if __name__ == '__main__':
                             displayiters=displayiters,
                             maxiters=maxiters_dgp,
                             multiview=multiview,
-                            epipolar_wt=epipolar_wt)
+                            epipolar_wt=epipolar_wt,
+                            debug=debug)
         snapshot = 'snapshot-step{}-final--0'.format(step)
 
         # %% step 2 DGP
@@ -136,7 +139,8 @@ if __name__ == '__main__':
                 gm2=gm2,
                 gm3=gm3,
                 multiview=multiview,
-                epipolar_wt=epipolar_wt)
+                epipolar_wt=epipolar_wt,
+                debug=debug)
 
         snapshot = 'snapshot-step{}-final--0'.format(step)
 
