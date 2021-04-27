@@ -323,7 +323,7 @@ def fit_dgp_labeledonly(
     # batching info
     batch_dict = dict(
         ns_jump=None,  # obsolete
-        step=1,  # obsolete
+        step=step,  # obsolete
         ns=ns,  # frames on either side of visible frames
         nc=nc,  # resnet channels
         n_max_frames=n_max_frames  # total number of frames (visible + hidden + windows) to train on
@@ -360,7 +360,7 @@ def fit_dgp_labeledonly(
     dgp_cfg.aug = aug  # data augmentation
 
     # skip this DGP with labeled frames only step if it's already done.
-    model_name = dgp_cfg.snapshot_prefix + '-step1-final--0.index'
+    model_name = dgp_cfg.snapshot_prefix + '-step{}-final--0.index'.format(step)
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP with labeled frames has already been run.', flush=True)
         return None
@@ -760,7 +760,7 @@ def fit_dgp(
     # Begin training
     # ------------------------------------------------------------------------------------
     batch_ind_all = gen_batch(visible_frame_total, hidden_frame_total, all_frame_total, dgp_cfg, maxiters)
-    save_iters = np.int(saveiters / dgp_cfg.batch_size)
+    save_iters = max(np.int(saveiters / dgp_cfg.batch_size), 1)
     maxiters = batch_ind_all.shape[0]
 
     pdata = PoseDataset(dgp_cfg)
