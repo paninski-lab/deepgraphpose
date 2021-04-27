@@ -56,7 +56,7 @@ if __name__ == '__main__':
     parser.add_argument("--multiview", action='store_true', default=False)
     parser.add_argument("--epipolar_wt", type=float, default=1.0)
     parser.add_argument("--debug", type=str, default='') # todo: come up with a better (more descriptive) name for this
-    parser.add_argument("--start_step", type=int, default=1,
+    parser.add_argument("--start_step", type=int, default=0,
                         help="0:dlc, 1:dgp_labeledonly, 2:dgp, 3:multiview labeled only, 4:dgp multiview ")
     input_params = parser.parse_known_args()[0]
     print(input_params)
@@ -109,7 +109,7 @@ if __name__ == '__main__':
             snapshot = dlcsnapshot  # snapshot for step 1
 
         # %% step 1 DGP labeled frames only
-        step = start_step
+        step = 1
         print_steps(step)
 
         fit_dgp_labeledonly(snapshot=snapshot,
@@ -125,7 +125,7 @@ if __name__ == '__main__':
         snapshot = 'snapshot-step{}-final--0'.format(step)
 
         # %% step 2 DGP
-        step += 1
+        step = 2
         print_steps(step)
         gm2, gm3 = 1, 3 # regularization constants
         fit_dgp(snapshot=snapshot,
