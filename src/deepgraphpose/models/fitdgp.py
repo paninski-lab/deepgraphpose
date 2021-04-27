@@ -571,7 +571,7 @@ def fit_dgp_labeledonly(
             # Periodically save losses. Write the losses to a csv file for further analysis
             if not os.path.exists('losses'):
                 os.makedirs('losses')
-            csv_path = './losses/step{}_it{}_{}_losses.csv'.format(step, it, debug)
+            csv_path = './losses/step{}{}_it{}_losses.csv'.format(step, debug, it)
             losses_df.to_csv(csv_path)
 
     time_end = time.time()
@@ -900,7 +900,7 @@ def fit_dgp(
             # Periodically save losses. Write the losses to a csv file for further analysis
             if not os.path.exists('losses'):
                 os.makedirs('losses')
-            csv_path = './losses/step{}_it{}_{}_losses.csv'.format(step, it, debug)
+            csv_path = './losses/step{}{}_it{}_losses.csv'.format(step, debug, it)
             losses_df.to_csv(csv_path)
 
     time_end = time.time()
