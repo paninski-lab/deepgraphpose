@@ -1,0 +1,3 @@
+python run_dgp_demo.py --dlcpath '/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05' --shuffle '1' --dlcsnapshot 'snapshot-step0-final--0' --multiview 'True' --epipolar_wt '0.1' --start_step '1' --test 'True'
+python run_dgp_demo.py --dlcpath '/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05' --shuffle '1' --dlcsnapshot 'snapshot-step0-final--0' --multiview 'True' --epipolar_wt '0.5' --start_step '3' --test 'True'
+python run_dgp_demo.py --dlcpath '/deepgraphpose/data/track_graph3d/ibl2cam-kelly-2020-04-05' --shuffle '1' --dlcsnapshot 'snapshot-step0-final--0' --multiview 'True' --epipolar_wt '10' --start_step '5' --test 'True'

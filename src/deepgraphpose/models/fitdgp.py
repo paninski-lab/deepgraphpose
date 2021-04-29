@@ -256,7 +256,7 @@ trainingsetindex=0):
 
 def fit_dgp_labeledonly(
         snapshot, dlcpath, shuffle=1, step=1, saveiters=1000, displayiters=5, maxiters=50000,
-        ns=10, nc=2048, n_max_frames=2000, aug=True,trainingsetindex=0, multiview=False):
+        ns=10, nc=2048, n_max_frames=2000, aug=True, debug='', trainingsetindex=0, multiview=False, epipolar_wt=1):
     """Run the DGP with labeled frames only.
     Parameters
     ----------
@@ -323,7 +323,7 @@ def fit_dgp_labeledonly(
     # batching info
     batch_dict = dict(
         ns_jump=None,  # obsolete
-        step=1,  # obsolete
+        step=step,  # obsolete
         ns=ns,  # frames on either side of visible frames
         nc=nc,  # resnet channels
         n_max_frames=n_max_frames  # total number of frames (visible + hidden + windows) to train on
@@ -344,6 +344,7 @@ def fit_dgp_labeledonly(
     dgp_cfg.ws_max = 1.2  # the multiplier for the upper bound of spatial distance
     dgp_cfg.wt = 0  # the temporal clique parameter
     dgp_cfg.wt_max = 0  # the upper bound of temporal distance
+    dgp_cfg.epipolar_wt = epipolar_wt  # the weight for the epipolar loss
     dgp_cfg.wn_visible = 1  # the network clique parameter for visible frames
     dgp_cfg.wn_hidden = 0  # the network clique parameter for hidden frames
     dgp_cfg.gamma = 1  # the multiplier for the softmax confidence map
@@ -359,7 +360,7 @@ def fit_dgp_labeledonly(
     dgp_cfg.aug = aug  # data augmentation
 
     # skip this DGP with labeled frames only step if it's already done.
-    model_name = dgp_cfg.snapshot_prefix + '-step1-final--0.index'
+    model_name = dgp_cfg.snapshot_prefix + '-step{}-final--0.index'.format(step)
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP with labeled frames has already been run.', flush=True)
         return None
@@ -448,12 +449,9 @@ def fit_dgp_labeledonly(
         pipeline = build_aug(apply_prob=0.8)
 
     time_start = time.time()
-    epipolar_losses = []
-    vis_losses = []
-    hid_losses = []
-    vis_loss_locref = []
-    ws_losses = []
-    total_losses = []
+    # initialize losses dataframe
+    losses_df = pd.DataFrame(columns=['epipolar_loss', 'visible_loss_pred', 'hidden_loss_pred',
+                                      'visible_loss_locref', 'ws_loss', 'total_loss'])
     for it in range(maxiters):
 
         current_lr = dgp_cfg.lr
@@ -578,30 +576,23 @@ def fit_dgp_labeledonly(
             print('\n running time: ', end_time00 - start_time00, flush=True)
             print('\n loss: ', loss_eval, flush=True)
 
-        # save the distinct losses # todo: make this a method which writes to a dataframe (less lines of code)
-        epipolar_losses.append(loss_eval['epipolar_loss'] if 'epipolar_loss' in loss_eval else None)
-        vis_losses.append(loss_eval['visible_loss_pred'] if 'visible_loss_pred' in loss_eval else None)
-        hid_losses.append(loss_eval['hidden_loss_pred'] if 'hidden_loss_pred' in loss_eval else None)
-        vis_loss_locref.append(loss_eval['visible_loss_locref'] if 'visible_loss_locref' in loss_eval else None)
-        ws_losses.append(loss_eval['ws_loss'] if 'ws_loss' in loss_eval else None)
-        total_losses.append(loss_eval['total_loss'] if 'total_loss' in loss_eval else None)
+        # save the distinct losses
+        losses_df = losses_df.append(pd.Series(loss_eval), ignore_index=True)
 
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
-            model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-'
+            model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug) + '-'
             saver.save(sess, model_name, global_step=it)
             saver.save(sess, model_name, global_step=0)
             if (it + 1) == maxiters:
-                model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-final-'
+                model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug) + '-final-'
                 saver.save(sess, model_name, global_step=0)
 
-            # periodically save losses
-            # write the losses to a csv file for further analysis
-            write_losses_to_csv(
-                [epipolar_losses, vis_losses, hid_losses, vis_loss_locref, ws_losses, total_losses],
-                ["epipolar loss", "visible loss", "hidden loss", "visible loss locref", "ws loss", "total loss"],
-                "./losses_labeledonly.csv"
-            )
+            # Periodically save losses. Write the losses to a csv file for further analysis
+            if not os.path.exists('losses'):
+                os.makedirs('losses')
+            csv_path = './losses/step{}{}_it{}_losses.csv'.format(step, debug, it)
+            losses_df.to_csv(csv_path)
 
     time_end = time.time()
     print('Finished training {} iterations\n'.format(it), flush=True)
@@ -613,7 +604,7 @@ def fit_dgp_labeledonly(
 def fit_dgp(
         snapshot, dlcpath, batch_size=10, shuffle=1, step=2, saveiters=1000, displayiters=5,
         maxiters=200000, ns=10, nc=2048, n_max_frames=2000, gm2=0, gm3=0, nepoch=100, wt=0, aug=True,
-        debug='', trainingsetindex=0, multiview=False):
+        debug='', trainingsetindex=0, multiview=False, epipolar_wt=1):
     """Run DGP.
     Parameters
     ----------
@@ -702,6 +693,7 @@ def fit_dgp(
     dgp_cfg.ws_max = 1.2  # the multiplier for the upper bound of spatial distance
     dgp_cfg.wt = wt  # the temporal clique parameter
     dgp_cfg.wt_max = 0  # the upper bound of temporal distance
+    dgp_cfg.epipolar_wt = epipolar_wt  # the weight for the epipolar loss
     dgp_cfg.wn_visible = 5  # the network clique parameter for visible frames
     dgp_cfg.wn_hidden = 3  # the network clique parameter for hidden frames
     dgp_cfg.gamma = 1  # the multiplier for the softmax confidence map
@@ -788,7 +780,7 @@ def fit_dgp(
     # Begin training
     # ------------------------------------------------------------------------------------
     batch_ind_all = gen_batch(visible_frame_total, hidden_frame_total, all_frame_total, dgp_cfg, maxiters)
-    save_iters = np.int(saveiters / dgp_cfg.batch_size)
+    save_iters = max(np.int(saveiters / dgp_cfg.batch_size), 1)
     maxiters = batch_ind_all.shape[0]
 
     pdata = PoseDataset(dgp_cfg)
@@ -801,12 +793,10 @@ def fit_dgp(
         pipeline = build_aug(apply_prob=0.8)
 
     time_start = time.time()
-    epipolar_losses = []
-    vis_losses = []
-    hid_losses = []
-    vis_loss_locref = []
-    ws_losses = []
-    total_losses = []
+
+    # initialize losses dataframe
+    losses_df = pd.DataFrame(columns=['epipolar_loss', 'visible_loss_pred', 'hidden_loss_pred',
+                                      'visible_loss_locref', 'ws_loss', 'total_loss'])
     for it in range(maxiters):
 
         current_lr = dgp_cfg.lr
@@ -915,17 +905,11 @@ def fit_dgp(
             print('\n loss: ', loss_eval, flush=True)
 
         # save the distinct losses
-        epipolar_losses.append(loss_eval['epipolar_loss'] if 'epipolar_loss' in loss_eval else None)
-        vis_losses.append(loss_eval['visible_loss_pred'] if 'visible_loss_pred' in loss_eval else None)
-        hid_losses.append(loss_eval['hidden_loss_pred'] if 'hidden_loss_pred' in loss_eval else None)
-        vis_loss_locref.append(loss_eval['visible_loss_locref'] if 'visible_loss_locref' in loss_eval else None)
-        ws_losses.append(loss_eval['ws_loss'] if 'ws_loss' in loss_eval else None)
-        total_losses.append(loss_eval['total_loss'] if 'total_loss' in loss_eval else None)
+        losses_df = losses_df.append(pd.Series(loss_eval), ignore_index=True)
 
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
             model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug)+ '-'
-            #print('Storing model {}'.format(model_name))
             saver.save(sess, model_name, global_step=it)
             saver.save(sess, model_name, global_step=0)
             if (it + 1) == maxiters:
@@ -933,21 +917,18 @@ def fit_dgp(
                 #print('Storing model {}'.format(model_name))
                 saver.save(sess, model_name, global_step=0)
 
-            # periodically save losses
-            # write the losses to a csv file for further analysis
-            write_losses_to_csv(
-                [epipolar_losses, vis_losses, hid_losses, vis_loss_locref, ws_losses, total_losses],
-                ["epipolar loss", "visible loss", "hidden loss", "visible loss locref", "ws loss", "total loss"],
-                "./losses.csv"
-            )
-
-
+            # Periodically save losses. Write the losses to a csv file for further analysis
+            if not os.path.exists('losses'):
+                os.makedirs('losses')
+            csv_path = './losses/step{}{}_it{}_losses.csv'.format(step, debug, it)
+            losses_df.to_csv(csv_path)
 
     time_end = time.time()
     print('Finished {} iterations\n'.format(it), flush=True)
     print('\n\n TOTAL TIME ELAPSED: ', time_end - time_start)
 
     return None
+
 
 # todo: this method is technically computing the predictions AND the loss. We should consider splitting this up into
 #       two separate functions for future ease-of-use.
@@ -1020,7 +1001,7 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
     ws_tf = TF.constant(ws, TF.float32)  # placeholder for the spatial clique ws; it varies across joints
     ws_max_tf = TF.constant(ws_max, TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
 
-    # Build the network # todo: why is this here? inside the loss function?
+    # Build the network # todo: why is this here? *Inside* the loss function?
     pn = PoseNet(dgp_cfg)
     net, end_points = pn.extract_features(inputs)
     scope = "pose"
@@ -1177,8 +1158,8 @@ def dgp_loss(data_batcher, dgp_cfg, placeholders):
             print('v2_pts: ', v2_pts)
             print('********************************************')
             epipolar_loss = compute_epipolar_loss(v1_pts, v2_pts, F)
-            
-            loss['epipolar_loss'] += epipolar_loss
+            loss['epipolar_loss'] += dgp_cfg.epipolar_wt * epipolar_loss
+
 
         total_loss += loss['epipolar_loss']
 
@@ -1333,24 +1314,4 @@ def compute_epipolar_loss(v1_pts, v2_pts, F):
     epipolar_loss = tf.norm(z, ord=2)
     return epipolar_loss
 
-
-def write_losses_to_csv(all_losses_list, loss_names, path):
-    """ Saves all losses to a csv where each row represents an iteration
-    Parameters
-    ----------
-    all_losses_list : a tuple containing each of the lists of distinct losses tracked
-    loss_names : a list containing the names of each of the distinct losses
-    path : where to save the csv
-
-    Returns
-    -------
-    None
-    """
-    # convert list to df of shape=(num_iters, num_distinct_losses)
-    all_losses_df = pd.DataFrame(np.array(all_losses_list).T)
-    # add column names
-    all_losses_df.columns = loss_names
-
-    # save losses to csv
-    all_losses_df.to_csv(path)
 

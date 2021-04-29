@@ -21,91 +21,11 @@ if sys.platform == 'darwin':
 os.environ["DLClight"] = "True"
 os.environ["Colab"] = "True"
 from deeplabcut.utils import auxiliaryfunctions
-
 from deepgraphpose.models.fitdgp import fit_dlc, fit_dgp, fit_dgp_labeledonly
 from deepgraphpose.models.fitdgp_util import get_snapshot_path
 from deepgraphpose.models.eval import plot_dgp
-
-
-def update_config_files(dlcpath):
-    base_path = os.getcwd()
-
-    # project config
-    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
-    with open(proj_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
-        video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
-        yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
-    with open(proj_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    # train model config
-    model_cfg_path = get_model_cfg_path(base_path, 'train')
-    with open(model_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['init_weights'] = get_init_weights_path(base_path)
-        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
-    with open(model_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    # download resnet weights if necessary
-    if not os.path.exists(yaml_cfg['init_weights']):
-        raise FileNotFoundError('Must download resnet-50 weights; see README for instructions')
-
-    # test model config
-    model_cfg_path = get_model_cfg_path(base_path, 'test')
-    with open(model_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['init_weights'] = get_init_weights_path(base_path)
-    with open(model_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    return os.path.join(base_path, dlcpath)
-
-
-def return_configs():
-    base_path = os.getcwd()
-    dlcpath = 'data/Reaching-Mackenzie-2018-08-30'
-
-    # project config
-    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
-    with open(proj_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['project_path'] = dlcpath
-        video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
-        yaml_cfg['video_sets']['videos/reachingvideo1.avi'] = yaml_cfg['video_sets'].pop(video_loc)
-    with open(proj_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    # train model config
-    model_cfg_path = get_model_cfg_path(base_path, 'train')
-    with open(model_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['init_weights'] = 'resnet_v1_50.ckpt'
-        yaml_cfg['project_path'] = dlcpath
-    with open(model_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    # test model config
-    model_cfg_path = get_model_cfg_path(base_path, 'test')
-    with open(model_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['init_weights'] = 'resnet_v1_50.ckpt'
-    with open(model_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-
-def get_model_cfg_path(base_path, dtype):
-    return os.path.join(
-        base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
-        dtype, 'pose_cfg.yaml')
-
-
-def get_init_weights_path(base_path):
-    return os.path.join(
-        base_path, 'src', 'DeepLabCut', 'deeplabcut', 'pose_estimation_tensorflow',
-        'models', 'pretrained', 'resnet_v1_50.ckpt')
+from demo_utils import get_video_sets, print_steps, get_model_cfg_path, get_init_weights_path, \
+    update_config_files, return_configs, clip_video, set_or_open_folder
 
 
 if __name__ == '__main__':
@@ -133,7 +53,11 @@ if __name__ == '__main__':
         default=10,
         help="size of the batch, if there are memory issues, decrease it value")
     parser.add_argument("--test", action='store_true', default=False)
-
+    parser.add_argument("--multiview", action='store_true', default=False)
+    parser.add_argument("--epipolar_wt", type=float, default=1.0)
+    parser.add_argument("--debug", type=str, default='') # todo: come up with a better (more descriptive) name for this
+    parser.add_argument("--start_step", type=int, default=0,
+                        help="0:dlc, 1:dgp_labeledonly, 2:dgp, 3:multiview labeled only, 4:dgp multiview ")
     input_params = parser.parse_known_args()[0]
     print(input_params)
 
@@ -142,6 +66,22 @@ if __name__ == '__main__':
     dlcsnapshot = input_params.dlcsnapshot
     batch_size = input_params.batch_size
     test = input_params.test
+    multiview = input_params.multiview
+    start_step = input_params.start_step
+    epipolar_wt = input_params.epipolar_wt
+    debug = input_params.debug
+
+    if test:  # we run for a short period
+        maxiters_dgp = 10
+        maxiters_dlc = 20
+        displayiters = 2
+        saveiters = 5
+    else:
+        maxiters_dgp = 50000
+        maxiters_dlc = 200000
+        displayiters = 100
+        saveiters = 1000
+        # TODO: check if these numbers should be different for DLC
 
     update_configs = False
     if dlcpath == 'data/Reaching-Mackenzie-2018-08-30':
@@ -157,89 +97,50 @@ if __name__ == '__main__':
 
         # %% step 0 DLC
         if dlcsnapshot is None:  # run DLC from scratch
-            print(
-                '''
-                =====================
-                |                   |
-                |                   |
-                |    Running DLC    |
-                |                   |
-                |                   |
-                =====================
-                '''
-                , flush=True)
+            step=0
+            print_steps(step=step)
             snapshot = 'resnet_v1_50.ckpt'
-            if test:
-                fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0, maxiters=2,
-                        displayiters=1)
-            else:
-                fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
-            snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+            fit_dlc(snapshot=snapshot, dlcpath=dlcpath,
+                    shuffle=shuffle, step=0, saveiters=saveiters,
+                    displayiters=displayiters, maxiters=maxiters_dlc)
+            snapshot = 'snapshot-step{}-final--0'.format(step)  # snapshot for initializing next step
 
         else:  # use the specified DLC snapshot to initialize DGP, and skip step 0
             snapshot = dlcsnapshot  # snapshot for step 1
 
         # %% step 1 DGP labeled frames only
-        print(
-            '''
-            ===============================================
-            |                                             |
-            |                                             |
-            |    Running DGP with labeled frames only     |
-            |                                             |
-            |                                             |
-            ===============================================
-            '''
-            , flush=True)
+        step = 1
+        print_steps(step)
 
-        if test:
-            fit_dgp_labeledonly(snapshot,
-                                dlcpath,
-                                shuffle=shuffle,
-                                step=1,
-                                maxiters=2,
-                                displayiters=1)
-        else:
-            fit_dgp_labeledonly(snapshot,
-                                dlcpath,
-                                shuffle=shuffle,
-                                step=1)
+        fit_dgp_labeledonly(snapshot=snapshot,
+                            dlcpath=dlcpath,
+                            shuffle=shuffle,
+                            step=step,
+                            saveiters=saveiters,
+                            displayiters=displayiters,
+                            maxiters=maxiters_dgp,
+                            multiview=multiview,
+                            epipolar_wt=epipolar_wt,
+                            debug=debug)
+        snapshot = 'snapshot-step{}-final--0'.format(step)
 
-        snapshot = 'snapshot-step1-final--0'
         # %% step 2 DGP
-        print(
-            '''
-            =====================
-            |                   |
-            |                   |
-            |    Running DGP    |
-            |                   |
-            |                   |
-            =====================
-            '''
-            , flush=True)
-        if test:
-            step = 2
-            gm2, gm3= 1, 3
-            fit_dgp(snapshot,
-                    dlcpath,
-                    batch_size=batch_size,
-                    shuffle=shuffle,
-                    step=step,
-                    maxiters=5,
-                    displayiters=1,
-                    gm2=gm2,
-                    gm3=gm3)
-        else:
-            step = 2
-            gm2, gm3 = 1, 3
-            fit_dgp(snapshot,
-                    dlcpath,
-                    batch_size=batch_size,
-                    shuffle=shuffle,
-                    step=step,
-                    gm2=gm2,
-                    gm3=gm3)
+        step = 2
+        print_steps(step)
+        gm2, gm3 = 1, 3 # regularization constants
+        fit_dgp(snapshot=snapshot,
+                dlcpath=dlcpath,
+                batch_size=batch_size,
+                shuffle=shuffle,
+                step=step,
+                saveiters=saveiters,
+                maxiters=maxiters_dgp,
+                displayiters=displayiters,
+                gm2=gm2,
+                gm3=gm3,
+                multiview=multiview,
+                epipolar_wt=epipolar_wt,
+                debug=debug)
 
         snapshot = 'snapshot-step{}-final--0'.format(step)
 
@@ -247,62 +148,28 @@ if __name__ == '__main__':
         # Test DGP model
         # --------------------------------------------------------------------------------
 
-        # %% step 3 predict on all videos in videos_dgp folder
-        print(
-            '''
-            ==========================
-            |                        |
-            |                        |
-            |    Predict with DGP    |
-            |                        |
-            |                        |
-            ==========================
-            '''
-            , flush=True)
-
+        # %% predict on all videos in videos_dgp folder
+        print_steps('prediction')
         snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
         cfg = auxiliaryfunctions.read_config(cfg_yaml)
 
-        video_path = str(Path(dlcpath) / 'videos_dgp')
-        if not (os.path.exists(video_path)):
-            print(video_path + " does not exist!")
-            video_sets = list(cfg['video_sets'])
-        else:
-            video_sets = [
-                video_path + '/' + f for f in listdir(video_path)
-                if isfile(join(video_path, f)) and (
-                        f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find(
-                    'mkv') > 0)
-            ]
-
-        video_pred_path = str(Path(dlcpath) / 'videos_pred')
-        if not os.path.exists(video_pred_path):
-            os.makedirs(video_pred_path)
-
+        video_sets = get_video_sets(dlcpath, cfg)
         print('video_sets', video_sets, flush=True)
 
-        if test:
-            for video_file in [video_sets[0]]:
-                from moviepy.editor import VideoFileClip
-                clip =VideoFileClip(str(video_file))
-                if clip.duration > 10:
-                    clip = clip.subclip(10)
-                video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.',1)[0] + '.mp4'
-                print('\nwriting {}'.format(video_file_name))
-                clip.write_videofile(video_file_name)
-                output_dir = os.getcwd() + '/'
-                plot_dgp(video_file=str(video_file_name),
-                         output_dir=output_dir,
-                         proj_cfg_file=str(cfg_yaml),
-                         dgp_model_file=str(snapshot_path),
-                         shuffle=shuffle)
-        else:
-            for video_file in video_sets:
-                plot_dgp(str(video_file),
-                         str(video_pred_path),
-                         proj_cfg_file=str(cfg_yaml),
-                         dgp_model_file=str(snapshot_path),
-                         shuffle=shuffle)
+        video_pred_path = set_or_open_folder(os.path.join(dlcpath, 'videos_pred'))
+
+        if test: # analyze a short clip from one video
+            print('clipping one video for test.')
+            short_video, _ = clip_video(video_sets[0], 10)
+            video_sets = [short_video]
+
+        for video_file in video_sets:
+            plot_dgp(video_file=str(video_file),
+                     output_dir=str(video_pred_path),
+                     proj_cfg_file=str(cfg_yaml),
+                     dgp_model_file=str(snapshot_path),
+                     shuffle=shuffle)
+
     finally:
 
         if update_configs:
