@@ -27,8 +27,9 @@ from deepgraphpose.models.fitdgp_util import get_snapshot_path
 from deepgraphpose.models.eval import plot_dgp
 
 
-def update_config_files_general(dlcpath):
+def update_config_files_general(dlcpath,shuffle):
     """General purpose version of the function below that applies to all models, not just the default reachingvideo. 
+    Requires in addition to the dlc path parameters from the project config file:
 
     """
     base_path = os.getcwd()
@@ -38,6 +39,9 @@ def update_config_files_general(dlcpath):
     with open(proj_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
+        task = yaml_cfg["Task"]
+        TrainingFraction = yaml_cfg["TrainingFraction"]
+        date = yaml_cfg["date"]
     #    video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
     #    try:
     #        yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
@@ -48,7 +52,8 @@ def update_config_files_general(dlcpath):
         yaml.dump(yaml_cfg, f)
 
     # train model config
-    model_cfg_path = get_model_cfg_path(base_path, 'train')
+    projectname = "{t}{d}-trainset{tf}shuffle{s}".format(t=Task,d=date,tf = int(TrainingFraction*100),s = shuffle)
+    model_cfg_path = get_model_cfg_path_general(base_path, 'train', projectname)
     with open(model_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['init_weights'] = get_init_weights_path(base_path)
@@ -61,7 +66,7 @@ def update_config_files_general(dlcpath):
         raise FileNotFoundError('Must download resnet-50 weights; see README for instructions')
 
     # test model config
-    model_cfg_path = get_model_cfg_path(base_path, 'test')
+    model_cfg_path = get_model_cfg_path_general(base_path, 'test', projectname)
     with open(model_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['init_weights'] = get_init_weights_path(base_path)
@@ -148,9 +153,12 @@ def get_model_cfg_path(base_path, dtype):
         base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
         dtype, 'pose_cfg.yaml')
 
-def get_model_cfg_path_general(base_path, dtype):
+def get_model_cfg_path_general(base_path, dtype, projectname):
+    """General purpose version of get_model_cfg_path that can work with non-demo projects. 
+
+    """
     return os.path.join(
-        base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
+        base_path, dlcpath, 'dlc-models', 'iteration-0', projectname,
         dtype, 'pose_cfg.yaml')
 
 
@@ -196,7 +204,7 @@ if __name__ == '__main__':
     test = input_params.test
 
     # update config files
-    dlcpath = update_config_files_general(dlcpath)
+    dlcpath = update_config_files_general(dlcpath,shuffle)
     update_configs = True
 
     # ------------------------------------------------------------------------------------

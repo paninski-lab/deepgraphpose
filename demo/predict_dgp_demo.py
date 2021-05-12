@@ -149,7 +149,7 @@ if __name__ == '__main__':
     test = input_params.test
 
     # update config files
-    dlcpath = update_config_files_general(dlcpath)
+    dlcpath = update_config_files_general(dlcpath,shuffle)
     update_configs = True
 
     ## Specifying snapshot manually at the moment assuming training. 
