@@ -27,92 +27,6 @@ from deepgraphpose.models.fitdgp_util import get_snapshot_path
 from deepgraphpose.models.eval import plot_dgp
 from run_dgp_demo import update_config_files_general
 
-
-def update_config_files(dlcpath):
-    base_path = os.getcwd()
-
-    # project config
-    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
-    with open(proj_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
-        video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
-        try:
-            yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
-        except KeyError:    
-            ## check if update has already been done. 
-            assert yaml_cfg["video_sets"].get(video_loc,False), "Can't find original or updated video path in config file."
-    with open(proj_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    # train model config
-    model_cfg_path = get_model_cfg_path(base_path, 'train')
-    with open(model_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['init_weights'] = get_init_weights_path(base_path)
-        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
-    with open(model_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    # download resnet weights if necessary
-    if not os.path.exists(yaml_cfg['init_weights']):
-        raise FileNotFoundError('Must download resnet-50 weights; see README for instructions')
-
-    # test model config
-    model_cfg_path = get_model_cfg_path(base_path, 'test')
-    with open(model_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['init_weights'] = get_init_weights_path(base_path)
-    with open(model_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    return os.path.join(base_path, dlcpath)
-
-
-def return_configs():
-    base_path = os.getcwd()
-    dlcpath = 'data/Reaching-Mackenzie-2018-08-30'
-
-    # project config
-    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
-    with open(proj_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['project_path'] = dlcpath
-        video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
-        yaml_cfg['video_sets']['videos/reachingvideo1.avi'] = yaml_cfg['video_sets'].pop(video_loc)
-    with open(proj_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    # train model config
-    model_cfg_path = get_model_cfg_path(base_path, 'train')
-    with open(model_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['init_weights'] = 'resnet_v1_50.ckpt'
-        yaml_cfg['project_path'] = dlcpath
-    with open(model_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-    # test model config
-    model_cfg_path = get_model_cfg_path(base_path, 'test')
-    with open(model_cfg_path, 'r') as f:
-        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['init_weights'] = 'resnet_v1_50.ckpt'
-    with open(model_cfg_path, 'w') as f:
-        yaml.dump(yaml_cfg, f)
-
-
-def get_model_cfg_path(base_path, dtype):
-    return os.path.join(
-        base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
-        dtype, 'pose_cfg.yaml')
-
-
-def get_init_weights_path(base_path):
-    return os.path.join(
-        base_path, 'src', 'DeepLabCut', 'deeplabcut', 'pose_estimation_tensorflow',
-        'models', 'pretrained', 'resnet_v1_50.ckpt')
-
-
 if __name__ == '__main__':
 
     # %% set up dlcpath for DLC project and hyperparameters
@@ -202,12 +116,11 @@ if __name__ == '__main__':
                 clip =VideoFileClip(str(video_file))
                 if clip.duration > 10:
                     clip = clip.subclip(10)
-                video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.',1)[0] + '.mp4'
+                video_file_name = os.path.splitext(video_file)[0] +"test"+ ".mp4" 
                 print('\nwriting {}'.format(video_file_name))
                 clip.write_videofile(video_file_name)
-                output_dir = os.getcwd() + '/'
-                plot_dgp(video_file=str(video_file_name),
-                         output_dir=output_dir,
+                plot_dgp(str(video_file_name),
+                         str(video_pred_path),
                          proj_cfg_file=str(cfg_yaml),
                          dgp_model_file=str(snapshot_path),
                          shuffle=shuffle)
@@ -219,6 +132,7 @@ if __name__ == '__main__':
                          dgp_model_file=str(snapshot_path),
                          shuffle=shuffle)
     finally:
+        pass
 
         #if update_configs:
         #    return_configs()
