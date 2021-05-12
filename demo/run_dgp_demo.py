@@ -69,6 +69,7 @@ def update_config_files_general(dlcpath):
         yaml.dump(yaml_cfg, f)
 
     return os.path.join(base_path, dlcpath)
+
 def update_config_files(dlcpath):
     base_path = os.getcwd()
 
@@ -143,6 +144,11 @@ def return_configs():
 
 
 def get_model_cfg_path(base_path, dtype):
+    return os.path.join(
+        base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
+        dtype, 'pose_cfg.yaml')
+
+def get_model_cfg_path_general(base_path, dtype):
     return os.path.join(
         base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
         dtype, 'pose_cfg.yaml')
