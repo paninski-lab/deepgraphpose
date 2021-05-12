@@ -147,11 +147,9 @@ if __name__ == '__main__':
     batch_size = input_params.batch_size
     test = input_params.test
 
-    update_configs = False
-    if dlcpath == 'data/Reaching-Mackenzie-2018-08-30':
-        # update config files
-        dlcpath = update_config_files(dlcpath)
-        update_configs = True
+    # update config files
+    dlcpath = update_config_files(dlcpath)
+    update_configs = True
 
     # ------------------------------------------------------------------------------------
     # Train models
@@ -308,6 +306,7 @@ if __name__ == '__main__':
                          dgp_model_file=str(snapshot_path),
                          shuffle=shuffle)
     finally:
+        pass
 
-        if update_configs:
-            return_configs()
+        #if update_configs:
+        #    return_configs()

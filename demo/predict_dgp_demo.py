@@ -147,11 +147,9 @@ if __name__ == '__main__':
     batch_size = input_params.batch_size
     test = input_params.test
 
-    update_configs = False
-    if dlcpath == 'data/Reaching-Mackenzie-2018-08-30':
-        # update config files
-        dlcpath = update_config_files(dlcpath)
-        update_configs = True
+    # update config files
+    dlcpath = update_config_files(dlcpath)
+    update_configs = True
 
     ## Specifying snapshot manually at the moment assuming training. 
     step = 2
@@ -221,5 +219,5 @@ if __name__ == '__main__':
                          shuffle=shuffle)
     finally:
 
-        if update_configs:
-            return_configs()
+        #if update_configs:
+        #    return_configs()
