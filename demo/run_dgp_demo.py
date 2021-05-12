@@ -40,8 +40,15 @@ def update_config_files_general(dlcpath,shuffle):
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
         task = yaml_cfg["Task"]
-        TrainingFraction = yaml_cfg["TrainingFraction"]
+        TrainingFraction = yaml_cfg["TrainingFraction"][0] ## Train with the first training fraction. 
         date = yaml_cfg["date"]
+        try:
+            video_locs = yaml_cfg["video_sets"]
+            full_sets = [os.path.join(base_path,dlcpath,vl) for vl in video_locs]
+            yaml_cfg["video_sets"] = full_sets
+        except KeyError:    
+            print("no videos given.")
+
     #    video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
     #    try:
     #        yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
@@ -52,7 +59,7 @@ def update_config_files_general(dlcpath,shuffle):
         yaml.dump(yaml_cfg, f)
 
     # train model config
-    projectname = "{t}{d}-trainset{tf}shuffle{s}".format(t=Task,d=date,tf = int(TrainingFraction*100),s = shuffle)
+    projectname = "{t}{d}-trainset{tf}shuffle{s}".format(t=task,d=date,tf = int(TrainingFraction*100),s = shuffle)
     model_cfg_path = get_model_cfg_path_general(base_path, 'train', projectname)
     with open(model_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
