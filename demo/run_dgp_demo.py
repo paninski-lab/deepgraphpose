@@ -60,7 +60,7 @@ def update_config_files_general(dlcpath,shuffle):
 
     # train model config
     projectname = "{t}{d}-trainset{tf}shuffle{s}".format(t=task,d=date,tf = int(TrainingFraction*100),s = shuffle)
-    model_cfg_path = get_model_cfg_path_general(base_path, 'train', projectname)
+    model_cfg_path = get_model_cfg_path_general(base_path, dlcpath, 'train', projectname)
     with open(model_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['init_weights'] = get_init_weights_path(base_path)
@@ -73,7 +73,7 @@ def update_config_files_general(dlcpath,shuffle):
         raise FileNotFoundError('Must download resnet-50 weights; see README for instructions')
 
     # test model config
-    model_cfg_path = get_model_cfg_path_general(base_path, 'test', projectname)
+    model_cfg_path = get_model_cfg_path_general(base_path, dlcpath, 'test', projectname)
     with open(model_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['init_weights'] = get_init_weights_path(base_path)
@@ -160,7 +160,7 @@ def get_model_cfg_path(base_path, dtype):
         base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
         dtype, 'pose_cfg.yaml')
 
-def get_model_cfg_path_general(base_path, dtype, projectname):
+def get_model_cfg_path_general(base_path, dlcpath, dtype, projectname):
     """General purpose version of get_model_cfg_path that can work with non-demo projects. 
 
     """
