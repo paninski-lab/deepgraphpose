@@ -289,12 +289,12 @@ if __name__ == '__main__':
                 clip =VideoFileClip(str(video_file))
                 if clip.duration > 10:
                     clip = clip.subclip(10)
-                video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.',1)[0] + '.mp4'
+                #video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.',1)[0] + '.mp4'
+                video_file_name = video_file.splitext("avi")[0] +"test"+ ".mp4" 
                 print('\nwriting {}'.format(video_file_name))
                 clip.write_videofile(video_file_name)
-                output_dir = os.getcwd() + '/'
                 plot_dgp(video_file=str(video_file_name),
-                         output_dir=output_dir,
+                         str(video_pred_path),
                          proj_cfg_file=str(cfg_yaml),
                          dgp_model_file=str(snapshot_path),
                          shuffle=shuffle)
