@@ -25,6 +25,7 @@ from deeplabcut.utils import auxiliaryfunctions
 from deepgraphpose.models.fitdgp import fit_dlc, fit_dgp, fit_dgp_labeledonly
 from deepgraphpose.models.fitdgp_util import get_snapshot_path
 from deepgraphpose.models.eval import plot_dgp
+from run_dgp_demo import update_config_files_general
 
 
 def update_config_files(dlcpath):
@@ -148,7 +149,7 @@ if __name__ == '__main__':
     test = input_params.test
 
     # update config files
-    dlcpath = update_config_files(dlcpath)
+    dlcpath = update_config_files_general(dlcpath)
     update_configs = True
 
     ## Specifying snapshot manually at the moment assuming training. 

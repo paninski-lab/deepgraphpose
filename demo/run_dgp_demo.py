@@ -27,6 +27,48 @@ from deepgraphpose.models.fitdgp_util import get_snapshot_path
 from deepgraphpose.models.eval import plot_dgp
 
 
+def update_config_files_general(dlcpath):
+    """General purpose version of the function below that applies to all models, not just the default reachingvideo. 
+
+    """
+    base_path = os.getcwd()
+
+    # project config
+    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
+    with open(proj_cfg_path, 'r') as f:
+        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
+        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
+    #    video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
+    #    try:
+    #        yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
+    #    except KeyError:    
+    #        ## check if update has already been done. 
+    #        assert yaml_cfg["video_sets"].get(video_loc,False), "Can't find original or updated video path in config file."
+    with open(proj_cfg_path, 'w') as f:
+        yaml.dump(yaml_cfg, f)
+
+    # train model config
+    model_cfg_path = get_model_cfg_path(base_path, 'train')
+    with open(model_cfg_path, 'r') as f:
+        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
+        yaml_cfg['init_weights'] = get_init_weights_path(base_path)
+        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
+    with open(model_cfg_path, 'w') as f:
+        yaml.dump(yaml_cfg, f)
+
+    # download resnet weights if necessary
+    if not os.path.exists(yaml_cfg['init_weights']):
+        raise FileNotFoundError('Must download resnet-50 weights; see README for instructions')
+
+    # test model config
+    model_cfg_path = get_model_cfg_path(base_path, 'test')
+    with open(model_cfg_path, 'r') as f:
+        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
+        yaml_cfg['init_weights'] = get_init_weights_path(base_path)
+    with open(model_cfg_path, 'w') as f:
+        yaml.dump(yaml_cfg, f)
+
+    return os.path.join(base_path, dlcpath)
 def update_config_files(dlcpath):
     base_path = os.getcwd()
 
@@ -148,7 +190,7 @@ if __name__ == '__main__':
     test = input_params.test
 
     # update config files
-    dlcpath = update_config_files(dlcpath)
+    dlcpath = update_config_files_general(dlcpath)
     update_configs = True
 
     # ------------------------------------------------------------------------------------
@@ -290,10 +332,10 @@ if __name__ == '__main__':
                 if clip.duration > 10:
                     clip = clip.subclip(10)
                 #video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.',1)[0] + '.mp4'
-                video_file_name = video_file.splitext("avi")[0] +"test"+ ".mp4" 
+                video_file_name = os.path.splitext(video_file)[0] +"test"+ ".mp4" 
                 print('\nwriting {}'.format(video_file_name))
                 clip.write_videofile(video_file_name)
-                plot_dgp(video_file=str(video_file_name),
+                plot_dgp(str(video_file_name),
                          str(video_pred_path),
                          proj_cfg_file=str(cfg_yaml),
                          dgp_model_file=str(snapshot_path),
