@@ -10,8 +10,11 @@ import os
 from os import listdir
 from os.path import isfile, join
 from pathlib import Path
+from joblib import Memory
 import sys
 import yaml
+import pandas as pd
+import numpy as np
 
 if sys.platform == 'darwin':
     import wx
@@ -20,6 +23,9 @@ if sys.platform == 'darwin':
 
 os.environ["DLClight"] = "True"
 os.environ["Colab"] = "True"
+
+from moviepy.editor import VideoFileClip
+                
 from deeplabcut.utils import auxiliaryfunctions
 
 from deepgraphpose.models.fitdgp import fit_dlc, fit_dgp, fit_dgp_labeledonly
@@ -34,10 +40,11 @@ if __name__ == '__main__':
     # %% set up dlcpath for DLC project and hyperparameters
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--dlcpath",
+        "--modelpaths",
+        nargs="+",
         type=str,
         default=None,
-        help="the absolute path of the DLC project",
+        help="the absolute path of the DLC projects you want to ensemble",
     )
 
     parser.add_argument(
@@ -45,6 +52,13 @@ if __name__ == '__main__':
         type=str,
         default=None,
         help="use the DLC snapshot to initialize DGP",
+    )
+
+    parser.add_argument(
+        "--videopath",
+        type=str,
+        default=None,
+        help="path to video",
     )
 
     parser.add_argument("--shuffle", type=int, default=1, help="Project shuffle")
@@ -58,15 +72,17 @@ if __name__ == '__main__':
     input_params = parser.parse_known_args()[0]
     print(input_params)
 
-    dlcpath = input_params.dlcpath
+    modelpaths = input_params.modelpaths
     shuffle = input_params.shuffle
+    videopath = input_params.videopath
     dlcsnapshot = input_params.dlcsnapshot
     batch_size = input_params.batch_size
     test = input_params.test
 
     # update config files
-    dlcpath = update_config_files_general(dlcpath,shuffle)
-    update_configs = True
+    for modelpath in modelpaths:
+        dlcpath = update_config_files_general(modelpath,shuffle)
+        update_configs = True
 
     ## Specifying snapshot manually at the moment assuming training. 
     step = 2
@@ -81,58 +97,74 @@ if __name__ == '__main__':
         # %% step 3 predict on all videos in videos_dgp folder
         print(
             '''
-            ==========================
-            |                        |
-            |                        |
-            |    Predict with DGP    |
-            |                        |
-            |                        |
-            ==========================
+            ==================================
+            |                                |
+            |                                |
+            |    Predict with DGP Ensemble   |
+            |                                |
+            |                                |
+            ==================================
             '''
             , flush=True)
 
-        snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
-        cfg = auxiliaryfunctions.read_config(cfg_yaml)
+        ## get ensembleparameters
+        topdir = os.path.dirname(modelpaths[0]) ## they're all loaded into the same anyway. 
+        modeldirs = [os.path.basename(m) for m in modelpaths]
+        videoext = os.path.splitext(videopath)[-1].split(".",1)[-1] ## remove the dot as well. 
+        video = VideoFileClip(videopath)
+        ## Write results to:
+        resultpath = os.path.join(os.path.dirname(os.path.dirname(videopath)),"results")
 
-        video_path = str(Path(dlcpath) / 'videos_dgp')
-        if not (os.path.exists(video_path)):
-            print(video_path + " does not exist!")
-            video_sets = list(cfg['video_sets'])
-        else:
-            video_sets = [
-                video_path + '/' + f for f in listdir(video_path)
-                if isfile(join(video_path, f)) and (
-                        f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find(
-                    'mkv') > 0)
-            ]
 
-        video_pred_path = str(Path(dlcpath) / 'videos_pred')
-        if not os.path.exists(video_pred_path):
-            os.makedirs(video_pred_path)
 
-        print('video_sets', video_sets, flush=True)
+        framelength = int(video.duration*video.fps)
+        ## can do some processing based on length here. 
+        framerange = range(0,framelength)
 
-        if test:
-            for video_file in [video_sets[0]]:
-                from moviepy.editor import VideoFileClip
-                clip =VideoFileClip(str(video_file))
-                if clip.duration > 10:
-                    clip = clip.subclip(10)
-                video_file_name = os.path.splitext(video_file)[0] +"test"+ ".mp4" 
-                print('\nwriting {}'.format(video_file_name))
-                clip.write_videofile(video_file_name)
-                plot_dgp(str(video_file_name),
-                         str(video_pred_path),
-                         proj_cfg_file=str(cfg_yaml),
-                         dgp_model_file=str(snapshot_path),
-                         shuffle=shuffle)
-        else:
-            for video_file in video_sets:
-                plot_dgp(str(video_file),
-                         str(video_pred_path),
-                         proj_cfg_file=str(cfg_yaml),
-                         dgp_model_file=str(snapshot_path),
-                         shuffle=shuffle)
+        remoteensemble = Ensemble(topdir,modeldirs,videoext,memory = Memory(os.path.dirname(videopath)))
+        [model.predict(videopath) for model in remoteensemble.models.values()]
+        predict_videoname = "_labeled".join(os.path.splitext(os.path.basename(videopath)))
+        predict_h5name = "_labeled".join([os.path.splitext(os.path.basename(videopath))[0],".h5"])
+        consensus_videoname = "_labeled_consensus".join(os.path.splitext(os.path.basename(videopath)))
+        consensus_csvname = "_labeled_consensus".join([os.path.splitext(os.path.basename(videopath))[0],".csv"])
+        consensus_h5name = "_labeled_consensus".join([os.path.splitext(os.path.basename(videopath))[0],".h5"])
+        ## outputs pose of shape xy, time, body part 
+        meanx,meany = remoteensemble.get_mean_pose(predict_videoname,framerange,snapshot = snapshot, shuffle = shuffle) 
+
+        ## reshape and save in shape of existing: 
+        likearray = np.empty(meanx.shape) ## don't get likelihoods right now. 
+        likearray[:] = np.NaN
+        stacked = np.stack((meanx,meany,likearray),axis = -1)
+        dfshaped = stacked.reshape(stacked.shape[0],stacked.shape[1]*stacked.shape[2])
+        ## get sample dataframe:
+        sampledf = pd.read_hdf(os.path.join(modelpaths[0],"videos_pred",predict_h5name))
+        sampledf.iloc[:len(dfshaped),:] = dfshaped
+        sampledf.drop([i for i in range(len(dfshaped),len(sampledf))],inplace = True)
+        
+        sampledf.to_csv(os.path.join(resultpath,consensus_csvname))
+        sampledf.to_hdf(os.path.join(resultpath,consensus_h5name),key="consensus")
+
+        ### Not writing video of consensus for now: 
+        #if test:
+        #    for video_file in [video_sets[0]]:
+        #        clip =VideoFileClip(str(video_file))
+        #        if clip.duration > 10:
+        #            clip = clip.subclip(10)
+        #        video_file_name = os.path.splitext(video_file)[0] +"test"+ ".mp4" 
+        #        print('\nwriting {}'.format(video_file_name))
+        #        clip.write_videofile(video_file_name)
+        #        plot_dgp(str(video_file_name),
+        #                 str(video_pred_path),
+        #                 proj_cfg_file=str(cfg_yaml),
+        #                 dgp_model_file=str(snapshot_path),
+        #                 shuffle=shuffle)
+        #else:
+        #    for video_file in video_sets:
+        #        plot_dgp(str(video_file),
+        #                 str(video_pred_path),
+        #                 proj_cfg_file=str(cfg_yaml),
+        #                 dgp_model_file=str(snapshot_path),
+        #                 shuffle=shuffle)
     finally:
         pass
 
