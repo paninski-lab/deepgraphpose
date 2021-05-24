@@ -44,7 +44,9 @@ def update_config_files_general(dlcpath,shuffle):
         date = yaml_cfg["date"]
         try:
             video_locs = yaml_cfg["video_sets"]
-            full_sets = {os.path.join(base_path,dlcpath,vl):cropdata for vl,cropdata in video_locs.items()}
+            #full_sets = {os.path.join(base_path,dlcpath,vl):cropdata for vl,cropdata in video_locs.items()}
+            ## TODO Test this bottom line: assume videos are correctly located in the directory's videos subdir. 
+            full_sets = {os.path.join(base_path,dlcpath,"videos",os.path.basename(vl)):cropdata for vl,cropdata in video_locs.items()}
             yaml_cfg["video_sets"] = full_sets
         except KeyError:    
             print("no videos given.")
