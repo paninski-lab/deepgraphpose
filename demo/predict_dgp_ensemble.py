@@ -141,6 +141,9 @@ if __name__ == '__main__':
         sampledf.iloc[:len(dfshaped),:] = dfshaped
         sampledf.drop([i for i in range(len(dfshaped),len(sampledf))],inplace = True)
         
+        if not os.path.isdir(resultpath):
+            os.makedirs(resultpath)
+
         sampledf.to_csv(os.path.join(resultpath,consensus_csvname))
         sampledf.to_hdf(os.path.join(resultpath,consensus_h5name),key="consensus")
 
