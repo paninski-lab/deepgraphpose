@@ -133,7 +133,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=10,
+        default=4,
         help="size of the batch, if there are memory issues, decrease it value")
     parser.add_argument("--test", action='store_true', default=False)
 
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     dlcpath = input_params.dlcpath
     shuffle = input_params.shuffle
     dlcsnapshot = input_params.dlcsnapshot
-    batch_size = input_params.batch_size
+    batch_size = input_params.batch_size 
     test = input_params.test
 
     update_configs = False

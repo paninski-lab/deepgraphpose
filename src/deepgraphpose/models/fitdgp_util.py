@@ -1,7 +1,7 @@
 import tensorflow as tf
 from pathlib import Path
 import numpy as np
-import tensorflow.contrib.slim as slim
+import tf_slim as slim
 from deeplabcut.utils import auxiliaryfunctions
 import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
@@ -52,8 +52,8 @@ def dgp_prediction_layer(weight_dlc,
                         activation_fn=None,
                         normalizer_fn=None,
                         weights_regularizer=slim.l2_regularizer(
-                            dlc_cfg.weight_decay)):
-        with TF.variable_scope(name, reuse=tf.AUTO_REUSE):
+                            dlc_cfg['weight_decay'])):
+        with TF.compat.v1.variable_scope(name, reuse=tf.compat.v1.AUTO_REUSE):
             if init_flag:
                 pred = slim.conv2d_transpose(
                     inputs,
@@ -160,10 +160,10 @@ def gen_batch(visible_frame_total, hidden_frame_total, all_frame_total, dgp_cfg,
 
     """
 
-    batch_size = dgp_cfg.batch_size
+    batch_size = dgp_cfg['batch_size']
     n_frames_total = np.sum([len(v) for v in all_frame_total])
     n_datasets = len(all_frame_total)
-    nepoch = np.min([int(n_frames_total * dgp_cfg.n_times_all_frames /
+    nepoch = np.min([int(n_frames_total * dgp_cfg['n_times_all_frames'] /
                                 batch_size), maxiters])
 
     print('nepoch: ', nepoch)
@@ -175,7 +175,7 @@ def gen_batch(visible_frame_total, hidden_frame_total, all_frame_total, dgp_cfg,
         index_vh_i = list(all_frame_total[i]) + list(hidden_frame_total[i])
         index_all_i = np.unique(list(index_v_i) + list(index_vh_i))
 
-        batch_size = dgp_cfg.batch_size
+        batch_size = dgp_cfg['batch_size']
         batchsize_i = max([1, int(nepoch / n_frames_total * len(index_all_i))])
 
         if len(index_all_i) < batch_size:
@@ -279,7 +279,7 @@ def rank(tensor):
 
 # Make Gaussian kernel following SciPy logic
 def make_gaussian_2d_kernel(sigma, truncate=1.0, dtype=TF.float32):
-    radius = TF.to_int32(sigma * truncate)
+    radius = TF.compat.v1.to_int32(sigma * truncate)
     x = TF.cast(TF.range(-radius, radius + 1), dtype=dtype)
     k = TF.exp(-0.5 * TF.square(x / sigma))
     k = k / TF.reduce_sum(k)
@@ -396,7 +396,7 @@ def argmax_2d_from_cm(tensor, nj, gamma=1, gauss_len=2, th=None):
 
     # Multiply (with broadcasting) and reduce over image dimensions to get the result
     # of shape [N, C, 2]
-    spatial_soft_argmax = TF.reduce_sum(softmax_tensor * image_coords, reduction_indices=[1, 2])
+    spatial_soft_argmax = TF.compat.v1.reduce_sum(softmax_tensor * image_coords, reduction_indices=[1, 2])
 
     # stack and return 2D coordinates
     return spatial_soft_argmax, softmax_tensor0
@@ -440,10 +440,10 @@ def data_aug(all_data_batch, visible_frame_within_batch, joint_loc, pipeline, dg
     visible_data = all_data_batch[visible_frame_within_batch, :, :, :].astype(np.uint8)
 
     # array to list
-    joint_loc_list = array2list(np.flip(joint_loc, 2) * dgp_cfg.stride + dgp_cfg.stride / 2, direct=1)
+    joint_loc_list = array2list(np.flip(joint_loc, 2) * dgp_cfg['stride'] + dgp_cfg['stride'] / 2, direct=1)
     batch_images, batch_joints = pipeline(images=visible_data, keypoints=joint_loc_list)
     # list to array
-    joint_loc_aug = np.flip(array2list(batch_joints, direct=-1) / dgp_cfg.stride - 0.5, 2)
+    joint_loc_aug = np.flip(array2list(batch_joints, direct=-1) / dgp_cfg['stride'] - 0.5, 2)
 
     all_data_batch_aug = np.copy(all_data_batch)
     all_data_batch_aug[visible_frame_within_batch, :, :, :] = batch_images

@@ -21,19 +21,21 @@ from random import randint
 
 import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+import tf_slim as slim
 
 import deeplabcut
 from deeplabcut.pose_estimation_tensorflow.config import load_config
-from deeplabcut.pose_estimation_tensorflow.dataset.factory import (
-    create as create_dataset, )
-from deeplabcut.pose_estimation_tensorflow.dataset.pose_defaultdataset import PoseDataset
-from deeplabcut.pose_estimation_tensorflow.nnet.net_factory import pose_net
-from deeplabcut.pose_estimation_tensorflow.train import LearningRate, get_batch_spec, \
+from deeplabcut.pose_estimation_tensorflow.datasets import (
+    PoseDatasetFactory,
+    ImgaugPoseDataset )
+from deeplabcut.pose_estimation_tensorflow.nnets import (
+    PoseNetFactory,
+    PoseResnet
+)
+from deeplabcut.pose_estimation_tensorflow.core.train import LearningRate, get_batch_spec, \
     setup_preloading, start_preloading, get_optimizer
 from deeplabcut.utils import auxiliaryfunctions
-from deeplabcut.pose_estimation_tensorflow.nnet.pose_net import PoseNet, losses, \
-    prediction_layer
+from deeplabcut.pose_estimation_tensorflow.nnets.layers import prediction_layer
 
 from deepgraphpose.dataset import MultiDataset, coord2map
 from deepgraphpose.models.fitdgp_util import gen_batch, argmax_2d_from_cm, combine_all_marker, build_aug, data_aug, learn_wt
@@ -51,7 +53,7 @@ else:
 
 # %%
 def fit_dlc(
-        snapshot, dlcpath, shuffle=1, step=0, saveiters=1000, displayiters=100, maxiters=200000,
+        snapshot, dlcpath, shuffle=1, step=0, saveiters=1000, displayiters=100, maxiters=50000,
 trainingsetindex=0):
     """Run the original DLC code.
     Parameters
@@ -90,103 +92,105 @@ trainingsetindex=0):
     # Change dlc_cfg as we want, here we set the default values
     # TODO: it would be better to set the default values when making config.yaml and pose_cfg.yaml, double check the default setting for these two yamls.
     dlc_cfg = load_config(pose_config_yaml)
-    dlc_cfg.crop = True
-    dlc_cfg.cropratio = 0.4
-    dlc_cfg.global_scale = 0.8
-    dlc_cfg.multi_step = [[0.001, 10000], [0.005, 430000], [0.002, 730000],
+    print(pose_config_yaml)
+    print(dlc_cfg)
+    dlc_cfg['crop'] = False
+    dlc_cfg['cropratio'] = 0.4
+    dlc_cfg['global_scale'] = 0.8
+    dlc_cfg['multi_step'] = [[0.001, 10000], [0.005, 430000], [0.002, 730000],
                           [0.001, 1030000]]
     if "snapshot" in snapshot:
         train_path = dlc_base_path / modelfoldername / 'train'
         init_weights = str(train_path / snapshot)
     else:
         parent_path = Path(os.path.dirname(deeplabcut.__file__))
-        snapshot = dlc_cfg.net_type.split('_')[0] + '_v1_' + dlc_cfg.net_type.split('_')[1] + '.ckpt'
+        snapshot = dlc_cfg['net_type'].split('_')[0] + '_v1_' + dlc_cfg['net_type'].split('_')[1] + '.ckpt'
         init_weights = str(
             parent_path /
             join('pose_estimation_tensorflow', 'models', 'pretrained', snapshot))
 
-    dlc_cfg.init_weights = init_weights
-    dlc_cfg.pos_dist_thresh = 8
-    dlc_cfg.output_stride = 16
+    dlc_cfg['init_weights'] = init_weights
+    dlc_cfg['pos_dist_thresh'] = 8
+    dlc_cfg['output_stride'] = 16
 
     # skip this DLC step if it's already done.
-    model_name = dlc_cfg.snapshot_prefix + '-step0-final--0.index'
+    model_name = dlc_cfg['snapshot_prefix'] + '-step0-final--0.index'
     if os.path.isfile(model_name):
         print(model_name, '  exists! The original DLC has already been run.', flush=True)
         return None
 
     # Build loss function
-    TF.reset_default_graph()
-
-    dataset = create_dataset(dlc_cfg)
+    TF.compat.v1.reset_default_graph()
+    dlc_cfg['dataset_type'] = 'deterministic'
+    dataset = PoseDatasetFactory.create(dlc_cfg)
     batch_spec = get_batch_spec(dlc_cfg)
     batch, enqueue_op, placeholders = setup_preloading(batch_spec)
 
-    losses = pose_net(dlc_cfg).train(batch)
+    losses = PoseNetFactory.create(dlc_cfg).train(batch)
     total_loss = losses["total_loss"]
-
+    print(losses.items())
     for k, t in losses.items():
-        TF.summary.scalar(k, t)
-    merged_summaries = TF.summary.merge_all()
+        TF.compat.v1.summary.scalar(k, t)
+    merged_summaries = TF.compat.v1.summary.merge_all()
 
-    if "snapshot" in Path(dlc_cfg.init_weights).stem:
+    if "snapshot" in Path(dlc_cfg['init_weights']).stem:
         print("Loading already trained DLC with backbone:",
-              dlc_cfg.net_type,
+              dlc_cfg['net_type'],
               flush=True)
         variables_to_restore = slim.get_variables_to_restore()
     else:
-        print("Loading ImageNet-pretrained", dlc_cfg.net_type, flush=True)
+        print("Loading ImageNet-pretrained", dlc_cfg['net_type'], flush=True)
         # loading backbone from ResNet, MobileNet etc.
-        if "resnet" in dlc_cfg.net_type:
+        if "resnet" in dlc_cfg['net_type']:
             variables_to_restore = slim.get_variables_to_restore(
                 include=["resnet_v1"])
-        elif "mobilenet" in dlc_cfg.net_type:
+        elif "mobilenet" in dlc_cfg['net_type']:
             variables_to_restore = slim.get_variables_to_restore(
                 include=["MobilenetV2"])
         else:
             print("Wait for DLC 2.3.")
 
-    restorer = TF.train.Saver(variables_to_restore)
-    saver = TF.train.Saver(
+    restorer = TF.compat.v1.train.Saver(variables_to_restore)
+    saver = TF.compat.v1.train.Saver(
         max_to_keep=5
     )  # selects how many snapshots are stored,
     # see https://github.com/AlexEMG/DeepLabCut/issues/8#issuecomment-387404835
 
     allow_growth = True
     if allow_growth:
-        config = TF.ConfigProto()
+        config = TF.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
-        sess = TF.Session(config=config)
+        sess = TF.compat.v1.Session(config=config)
     else:
-        sess = TF.Session()
+        sess = TF.compate.v1.Session()
 
     coord, thread = start_preloading(sess, enqueue_op, dataset, placeholders)
-    train_writer = TF.summary.FileWriter(dlc_cfg.log_dir, sess.graph)
-    learning_rate, train_op = get_optimizer(total_loss, dlc_cfg)
+    train_writer = TF.compat.v1.summary.FileWriter(dlc_cfg['log_dir'], sess.graph)
+    learning_rate, train_op, tstep = get_optimizer(total_loss, dlc_cfg)
 
-    sess.run(TF.global_variables_initializer())
-    sess.run(TF.local_variables_initializer())
+    sess.run(TF.compat.v1.global_variables_initializer())
+    sess.run(TF.compat.v1.local_variables_initializer())
 
     # Restore variables from disk.
-    restorer.restore(sess, dlc_cfg.init_weights)
+    restorer.restore(sess, dlc_cfg['init_weights'])
 
     # Run iterations
     if displayiters is None:
-        display_iters = max(1, int(dlc_cfg.display_iters))
+        display_iters = max(1, int(dlc_cfg['display_iters']))
     else:
         display_iters = max(1, int(displayiters))
         print("Display_iters overwritten as", display_iters, flush=True)
 
     if saveiters is None:
-        save_iters = max(1, int(dlc_cfg.save_iters))
+        save_iters = max(1, int(dlc_cfg['save_iters']))
     else:
         save_iters = max(1, int(saveiters))
         print("Save_iters overwritten as", save_iters, flush=True)
 
     if maxiters is None:
-        max_iter = int(dlc_cfg.multi_step[-1][1])
+        max_iter = int(dlc_cfg['multi_step'][-1][1])
     else:
-        max_iter = min(int(dlc_cfg.multi_step[-1][1]), int(maxiters))
+        max_iter = min(int(dlc_cfg['multi_step'][-1][1]), int(maxiters))
         print("Max_iters overwritten as", max_iter, flush=True)
 
     lr_gen = LearningRate(dlc_cfg)  # learning rate
@@ -206,7 +210,7 @@ trainingsetindex=0):
 
         # collect loss
         partloss += alllosses["part_loss"]  # scoremap loss
-        if dlc_cfg.location_refinement:
+        if dlc_cfg['location_refinement']:
             locrefloss += alllosses["locref_loss"]
         cumloss += loss_val
         train_writer.add_summary(summary, it)
@@ -236,11 +240,11 @@ trainingsetindex=0):
 
         # Save snapshot
         if (it % save_iters == 0 and it != 0) or it == max_iter:
-            model_name = dlc_cfg.snapshot_prefix + '-step' + str(
+            model_name = dlc_cfg['snapshot_prefix'] + '-step' + str(
                 step) + '-'
             saver.save(sess, model_name, global_step=it)
             if it == max_iter:
-                model_name = dlc_cfg.snapshot_prefix + '-step' + str(
+                model_name = dlc_cfg['snapshot_prefix'] + '-step' + str(
                     step) + '-final-'
                 saver.save(sess, model_name, global_step=0)
 
@@ -340,26 +344,26 @@ def fit_dgp_labeledonly(
                                 shuffle=shuffle,
                                 S0=S0)
     dgp_cfg = data_batcher.dlc_config
-    dgp_cfg.ws = 0  # the spatial clique parameter
-    dgp_cfg.ws_max = 1.2  # the multiplier for the upper bound of spatial distance
-    dgp_cfg.wt = 0  # the temporal clique parameter
-    dgp_cfg.wt_max = 0  # the upper bound of temporal distance
-    dgp_cfg.wn_visible = 1  # the network clique parameter for visible frames
-    dgp_cfg.wn_hidden = 0  # the network clique parameter for hidden frames
-    dgp_cfg.gamma = 1  # the multiplier for the softmax confidence map
-    dgp_cfg.gauss_len = 1  # the length scale for the Gaussian kernel convolving the softmax confidence map
-    dgp_cfg.lengthscale = 1  # the length scale for the Gaussian target map
-    dgp_cfg.max_to_keep = 5  # max number of snapshots to keep
-    dgp_cfg.batch_size = 1  # batch size
-    dgp_cfg.n_times_all_frames = 100  # the number of times each selected frames is iterated over
-    dgp_cfg.lr = 0.005  # learning rate
-    # dgp_cfg.net_type = 'resnet_50'
-    dgp_cfg.gm2 = 0  # scale target by confidence level
-    dgp_cfg.gm3 = 0  # scale hidden loss by confidence level
-    dgp_cfg.aug = aug  # data augmentation
+    dgp_cfg['ws'] = 0  # the spatial clique parameter
+    dgp_cfg['ws_max'] = 1.2  # the multiplier for the upper bound of spatial distance
+    dgp_cfg['wt'] = 0  # the temporal clique parameter
+    dgp_cfg['wt_max'] = 0  # the upper bound of temporal distance
+    dgp_cfg['wn_visible'] = 1  # the network clique parameter for visible frames
+    dgp_cfg['wn_hidden'] = 0  # the network clique parameter for hidden frames
+    dgp_cfg['gamma'] = 1  # the multiplier for the softmax confidence map
+    dgp_cfg['gauss_len'] = 1  # the length scale for the Gaussian kernel convolving the softmax confidence map
+    dgp_cfg['lengthscale'] = 1  # the length scale for the Gaussian target map
+    dgp_cfg['max_to_keep'] = 5  # max number of snapshots to keep
+    dgp_cfg['batch_size'] = 1  # batch size
+    dgp_cfg['n_times_all_frames'] = 100  # the number of times each selected frames is iterated over
+    dgp_cfg['lr'] = 0.005  # learning rate
+    # dgp_cfg['net_type'] = 'resnet_50'
+    dgp_cfg['gm2'] = 0  # scale target by confidence level
+    dgp_cfg['gm3'] = 0  # scale hidden loss by confidence level
+    dgp_cfg['aug'] = aug  # data augmentation
 
     # skip this DGP with labeled frames only step if it's already done.
-    model_name = dgp_cfg.snapshot_prefix + '-step1-final--0.index'
+    model_name = dgp_cfg['snapshot_prefix'] + '-step1-final--0.index'
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP with labeled frames has already been run.', flush=True)
         return None
@@ -386,9 +390,9 @@ def fit_dgp_labeledonly(
     # ------------------------------------------------------------------------------------
     # Build model
     # ------------------------------------------------------------------------------------
-    TF.reset_default_graph()
+    TF.compat.v1.reset_default_graph()
     loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg)
-    learning_rate = TF.placeholder(tf.float32, shape=[])
+    learning_rate = TF.compat.v1.compat.v1.placeholder(tf.float32, shape=[])
 
     # Restore network parameters for RESNET and COVNET
     variables_to_restore0 = slim.get_variables_to_restore(
@@ -396,29 +400,29 @@ def fit_dgp_labeledonly(
     variables_to_restore1 = slim.get_variables_to_restore(
         include=['pose/locref_pred'])
     variables_to_restore2 = slim.get_variables_to_restore(include=['resnet'])
-    restorer = TF.train.Saver(variables_to_restore0 + variables_to_restore1 +
+    restorer = TF.compat.v1.train.Saver(variables_to_restore0 + variables_to_restore1 +
                               variables_to_restore2)
-    saver = TF.train.Saver(max_to_keep=dgp_cfg.max_to_keep)
+    saver = TF.compat.v1.train.Saver(max_to_keep=dgp_cfg['max_to_keep'])
 
     # Set up session
     allow_growth = True
     if allow_growth:
-        config = TF.ConfigProto()
+        config = TF.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
-        sess = TF.Session(config=config)
+        sess = TF.compat.v1.Session(config=config)
     else:
-        sess = TF.Session()
+        sess = TF.compat.v1.Session()
 
     # Set up optimizer
-    all_train_vars = TF.trainable_variables()
-    optimizer = TF.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
+    all_train_vars = TF.compat.v1.trainable_variables()
+    optimizer = TF.compat.v1.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
     gradients, variables = zip(
         *optimizer.compute_gradients(total_loss_visible, var_list=all_train_vars))
     gradients, _ = TF.clip_by_global_norm(gradients, 10.0)
     train_op = optimizer.apply_gradients(zip(gradients, variables))
 
-    sess.run(TF.global_variables_initializer())
-    sess.run(TF.local_variables_initializer())
+    sess.run(TF.compat.v1.global_variables_initializer())
+    sess.run(TF.compat.v1.local_variables_initializer())
 
     # Restore RESNET var
     print('restoring resnet weights from %s' % init_weights)
@@ -428,7 +432,7 @@ def fit_dgp_labeledonly(
     # ------------------------------------------------------------------------------------
     # Begin training
     # ------------------------------------------------------------------------------------
-    nepoch = np.min([int(n_visible_frames_total * dgp_cfg.n_times_all_frames), maxiters])
+    nepoch = np.min([int(n_visible_frames_total * dgp_cfg['n_times_all_frames']), maxiters])
     visible_frame_total_dict = []
     for i, v in enumerate(visible_frame_total):
         for vv in v:
@@ -438,18 +442,19 @@ def fit_dgp_labeledonly(
     save_iters = saveiters
     maxiters = batch_ind_all.shape[0]
 
-    pdata = PoseDataset(dgp_cfg)
+    dgp_cfg['dataset_type'] = 'deterministic'
+    pdata = PoseDatasetFactory.create(dgp_cfg)
     data_batcher.reset()
 
     # %%
     print('Begin Training for {} iterations'.format(maxiters))
-    if dgp_cfg.aug:
+    if dgp_cfg['aug']:
         pipeline = build_aug(apply_prob=0.8)
     time_start = time.time()
 
     for it in range(maxiters):
 
-        current_lr = dgp_cfg.lr
+        current_lr = dgp_cfg['lr']
 
         # get batch index
         visible_batch_ind = visible_frame_total_dict[batch_ind_all[it]]
@@ -471,14 +476,14 @@ def fit_dgp_labeledonly(
         visible_frame_within_batch = [np.where(all_frame == i)[0][0] for i in visible_frame]
 
         # batch data for placeholders
-        if dgp_cfg.wt > 0:
+        if dgp_cfg['wt'] > 0:
             vector_field = learn_wt(all_data_batch)  # vector field from optical flow
         else:
             vector_field = np.zeros((1,1,1))
-        wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg.wt
+        wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg['wt']
 
         # data augmentation for visible frames
-        if dgp_cfg.aug and dgp_cfg.wt == 0 and len(visible_frame_within_batch) > 0:
+        if dgp_cfg['aug'] and dgp_cfg['wt'] == 0 and len(visible_frame_within_batch) > 0:
             all_data_batch, joint_loc = data_aug(all_data_batch, visible_frame_within_batch, joint_loc, pipeline, dgp_cfg)
 
         locref_targets_batch, locref_mask_batch = coord2map(pdata, joint_loc, nx_out, ny_out, nj)
@@ -532,11 +537,11 @@ def fit_dgp_labeledonly(
 
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
-            model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-'
+            model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) + '-'
             saver.save(sess, model_name, global_step=it)
             saver.save(sess, model_name, global_step=0)
             if (it + 1) == maxiters:
-                model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '-final-'
+                model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) + '-final-'
                 saver.save(sess, model_name, global_step=0)
 
     time_end = time.time()
@@ -635,26 +640,26 @@ def fit_dgp(
                                 shuffle=shuffle,
                                 S0=S0)
     dgp_cfg = data_batcher.dlc_config
-    dgp_cfg.ws = 1000  # the spatial clique parameter
-    dgp_cfg.ws_max = 1.2  # the multiplier for the upper bound of spatial distance
-    dgp_cfg.wt = wt  # the temporal clique parameter
-    dgp_cfg.wt_max = 0  # the upper bound of temporal distance
-    dgp_cfg.wn_visible = 5  # the network clique parameter for visible frames
-    dgp_cfg.wn_hidden = 3  # the network clique parameter for hidden frames
-    dgp_cfg.gamma = 1  # the multiplier for the softmax confidence map
-    dgp_cfg.gauss_len = 1  # the length scale for the Gaussian kernel convolving the softmax confidence map
-    dgp_cfg.lengthscale = 1  # the length scale for the Gaussian target map
-    dgp_cfg.max_to_keep = 5  # max number of snapshots to keep
-    dgp_cfg.batch_size = batch_size  # batch size
-    dgp_cfg.n_times_all_frames = nepoch  # the number of times each selected frames is iterated over
-    dgp_cfg.lr = 0.005  # learning rate
-    # dgp_cfg.net_type = 'resnet_50'
-    dgp_cfg.gm2 = gm2  # scale target by confidence level
-    dgp_cfg.gm3 = gm3  # scale hidden loss by confidence level
-    dgp_cfg.aug = aug  # data augmentation
+    dgp_cfg['ws'] = 1000  # the spatial clique parameter
+    dgp_cfg['ws_max'] = 1.2  # the multiplier for the upper bound of spatial distance
+    dgp_cfg['wt'] = wt  # the temporal clique parameter
+    dgp_cfg['wt_max'] = 0  # the upper bound of temporal distance
+    dgp_cfg['wn_visible'] = 5  # the network clique parameter for visible frames
+    dgp_cfg['wn_hidden'] = 3  # the network clique parameter for hidden frames
+    dgp_cfg['gamma'] = 1  # the multiplier for the softmax confidence map
+    dgp_cfg['gauss_len'] = 1  # the length scale for the Gaussian kernel convolving the softmax confidence map
+    dgp_cfg['lengthscale'] = 1  # the length scale for the Gaussian target map
+    dgp_cfg['max_to_keep'] = 5  # max number of snapshots to keep
+    dgp_cfg['batch_size'] = batch_size  # batch size
+    dgp_cfg['n_times_all_frames'] = nepoch  # the number of times each selected frames is iterated over
+    dgp_cfg['lr'] = 0.005  # learning rate
+    # dgp_cfg['net_type'] = 'resnet_50'
+    dgp_cfg['gm2'] = gm2  # scale target by confidence level
+    dgp_cfg['gm3'] = gm3  # scale hidden loss by confidence level
+    dgp_cfg['aug'] = aug  # data augmentation
 
     # skip this DGP step if it's already done.
-    model_name = dgp_cfg.snapshot_prefix + '-step{}{}-final--0.index'.format(step, debug)
+    model_name = dgp_cfg['snapshot_prefix'] + '-step{}{}-final--0.index'.format(step, debug)
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP has already been run.', flush=True)
         return None
@@ -681,9 +686,9 @@ def fit_dgp(
     # ------------------------------------------------------------------------------------
     # Build model
     # ------------------------------------------------------------------------------------
-    TF.reset_default_graph()
+    TF.compat.v1.reset_default_graph()
     loss, total_loss, total_loss_visible, placeholders = dgp_loss(data_batcher, dgp_cfg)
-    learning_rate = TF.placeholder(tf.float32, shape=[])
+    learning_rate = TF.compat.v1.placeholder(tf.float32, shape=[])
 
     # Restore network parameters for RESNET and COVNET
     variables_to_restore0 = slim.get_variables_to_restore(
@@ -691,29 +696,29 @@ def fit_dgp(
     variables_to_restore1 = slim.get_variables_to_restore(
         include=['pose/locref_pred'])
     variables_to_restore2 = slim.get_variables_to_restore(include=['resnet'])
-    restorer = TF.train.Saver(variables_to_restore0 + variables_to_restore1 +
+    restorer = TF.compat.v1.train.Saver(variables_to_restore0 + variables_to_restore1 +
                               variables_to_restore2)
-    saver = TF.train.Saver(max_to_keep=dgp_cfg.max_to_keep)
+    saver = TF.compat.v1.train.Saver(max_to_keep=dgp_cfg['max_to_keep'])
 
     # Set up session
     allow_growth = True
     if allow_growth:
-        config = TF.ConfigProto()
+        config = TF.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
-        sess = TF.Session(config=config)
+        sess = TF.compat.v1.Session(config=config)
     else:
-        sess = TF.Session()
+        sess = TF.compat.v1.Session()
 
     # Set up optimizer
-    all_train_vars = TF.trainable_variables()
-    optimizer = TF.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
+    all_train_vars = TF.compat.v1.trainable_variables()
+    optimizer = TF.compat.v1.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
     gradients, variables = zip(
         *optimizer.compute_gradients(total_loss, var_list=all_train_vars))
     gradients, _ = TF.clip_by_global_norm(gradients, 10.0)
     train_op = optimizer.apply_gradients(zip(gradients, variables))
 
-    sess.run(TF.global_variables_initializer())
-    sess.run(TF.local_variables_initializer())
+    sess.run(TF.compat.v1.global_variables_initializer())
+    sess.run(TF.compat.v1.local_variables_initializer())
 
     # Restore RESNET var
     print('restoring resnet weights from %s' % init_weights)
@@ -724,21 +729,23 @@ def fit_dgp(
     # Begin training
     # ------------------------------------------------------------------------------------
     batch_ind_all = gen_batch(visible_frame_total, hidden_frame_total, all_frame_total, dgp_cfg, maxiters)
-    save_iters = np.int(saveiters / dgp_cfg.batch_size)
+    save_iters = np.int(saveiters / dgp_cfg['batch_size'])
     maxiters = len(batch_ind_all)
 
-    pdata = PoseDataset(dgp_cfg)
+
+    dgp_cfg['dataset_type'] = 'deterministic'
+    pdata = PoseDatasetFactory.create(dgp_cfg)
     data_batcher.reset()
 
     # %%
     print('Begin Training for {} iterations'.format(maxiters))
-    if dgp_cfg.aug:
+    if dgp_cfg['aug']:
         pipeline = build_aug(apply_prob=0.8)
 
     time_start = time.time()
     for it in range(maxiters):
 
-        current_lr = dgp_cfg.lr
+        current_lr = dgp_cfg['lr']
 
         # get batch index
         batch_ind = batch_ind_all[it]
@@ -768,14 +775,14 @@ def fit_dgp(
         visible_frame_within_batch = [np.where(all_frame == i)[0][0] for i in visible_frame]
 
         # batch data for placeholders
-        if dgp_cfg.wt > 0:
+        if dgp_cfg['wt'] > 0:
             vector_field = learn_wt(all_data_batch)  # vector field from optical flow
         else:
             vector_field = np.zeros((1,1,1))
-        wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg.wt
+        wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg['wt']
 
         # data augmentation for visible frames
-        if dgp_cfg.aug and dgp_cfg.wt == 0 and len(visible_frame_within_batch) > 0:
+        if dgp_cfg['aug'] and dgp_cfg['wt'] == 0 and len(visible_frame_within_batch) > 0:
             all_data_batch, joint_loc = data_aug(all_data_batch, visible_frame_within_batch, joint_loc, pipeline, dgp_cfg)
 
         locref_targets_batch, locref_mask_batch = coord2map(pdata, joint_loc, nx_out, ny_out, nj)
@@ -829,12 +836,12 @@ def fit_dgp(
 
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
-            model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug)+ '-'
+            model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) + '{}'.format(debug)+ '-'
             #print('Storing model {}'.format(model_name))
             saver.save(sess, model_name, global_step=it)
             saver.save(sess, model_name, global_step=0)
             if (it + 1) == maxiters:
-                model_name = dgp_cfg.snapshot_prefix + '-step' + str(step) + '{}'.format(debug) +'-final-'
+                model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) + '{}'.format(debug) +'-final-'
                 #print('Storing model {}'.format(model_name))
                 saver.save(sess, model_name, global_step=0)
 
@@ -884,69 +891,69 @@ def dgp_loss(data_batcher, dgp_cfg):
     limb_full[np.abs(limb_full) > 1e5] = 0
     limb_full = np.reshape(limb_full, [joint_loc_full.shape[0], 2, -1])
     limb_full = np.sqrt(np.sum(np.square(limb_full), 1))
-    limb_full = limb_full.T * dgp_cfg.stride + dgp_cfg.stride / 2
-    ws_max = np.max(np.nan_to_num(limb_full), 1) * dgp_cfg.ws_max
+    limb_full = limb_full.T * dgp_cfg['stride'] + dgp_cfg['stride'] / 2
+    ws_max = np.max(np.nan_to_num(limb_full), 1) * dgp_cfg['ws_max']
 
     limb_full = np.true_divide(limb_full.sum(1), (limb_full != 0).sum(1))
     ws = 1 / (np.nan_to_num(
-        limb_full) + 1e-20) * dgp_cfg.ws  # spatial clique parameter based on the limb length and dlc_cfg.ws
+        limb_full) + 1e-20) * dgp_cfg['ws']  # spatial clique parameter based on the limb length and dlc_cfg.ws
 
     # Define placeholders
     # input and output
-    inputs = TF.placeholder(TF.float32, shape=[None, None, None, 3])
-    targets = TF.placeholder(TF.float32, shape=[None, nj, 2])
-    targets_nonan = TF.where(TF.is_nan(targets), TF.ones_like(targets) * 0, targets)  # set nan to be 0 in targets
+    inputs = TF.compat.v1.placeholder(TF.float32, shape=[None, None, None, 3])
+    targets = TF.compat.v1.placeholder(TF.float32, shape=[None, nj, 2])
+    targets_nonan = TF.where(TF.compat.v1.is_nan(targets), TF.ones_like(targets) * 0, targets)  # set nan to be 0 in targets
 
     # local refinement
-    locref_map = TF.placeholder(TF.float32, shape=[None, None, None, nj * 2])
-    locref_mask = TF.placeholder(TF.float32, shape=[None, None, None, nj * 2])
+    locref_map = TF.compat.v1.placeholder(TF.float32, shape=[None, None, None, nj * 2])
+    locref_mask = TF.compat.v1.placeholder(TF.float32, shape=[None, None, None, nj * 2])
 
     # placeholders for parameters
-    visible_marker_pl = TF.placeholder(TF.int32, shape=[
+    visible_marker_pl = TF.compat.v1.placeholder(TF.int32, shape=[
         None,
     ])  # placeholder for visible marker index in the batch
-    hidden_marker_pl = TF.placeholder(TF.int32, shape=[
+    hidden_marker_pl = TF.compat.v1.placeholder(TF.int32, shape=[
         None,
     ])  # placeholder for hidden marker index in the batch
-    visible_marker_in_targets_pl = TF.placeholder(TF.int32, shape=[
+    visible_marker_in_targets_pl = TF.compat.v1.placeholder(TF.int32, shape=[
         None,
     ])  # placeholder for visible marker index in targets/visible frames
 
-    nt_batch_pl = TF.placeholder(TF.int32, shape=[])  # placeholder for the total number of frames in the batch
+    nt_batch_pl = TF.compat.v1.placeholder(TF.int32, shape=[])  # placeholder for the total number of frames in the batch
 
-    wt_batch_pl = TF.placeholder(TF.float32, shape=[
+    wt_batch_pl = TF.compat.v1.placeholder(TF.float32, shape=[
         None, ])  # placeholder for the temporal clique wt; it's a vector which can contain different clique values for different frames
-    wt_batch_mask_pl = TF.placeholder(TF.float32, shape=[
+    wt_batch_mask_pl = TF.compat.v1.placeholder(TF.float32, shape=[
         None,
     ])  # placeholder for the batch mask for wt, 1 means wt is in the batch; 0 means wt is not in the batch
     wt_batch_tf = TF.multiply(wt_batch_pl, wt_batch_mask_pl)  # wt vector for the batch
-    wt_max_tf = TF.constant(dgp_cfg.wt_max, TF.float32)  # placeholder for the upper bounds for the temporal clique wt
+    wt_max_tf = TF.constant(dgp_cfg['wt_max'], TF.float32)  # placeholder for the upper bounds for the temporal clique wt
 
-    wn_visible_tf = TF.constant(dgp_cfg.wn_visible,
+    wn_visible_tf = TF.constant(dgp_cfg['wn_visible'],
                                 TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
-    wn_hidden_tf = TF.constant(dgp_cfg.wn_hidden,
+    wn_hidden_tf = TF.constant(dgp_cfg['wn_hidden'],
                                TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
 
     ws_tf = TF.constant(ws, TF.float32)  # placeholder for the spatial clique ws; it varies across joints
     ws_max_tf = TF.constant(ws_max,
                             TF.float32)  # placeholder for the upper bounds for the spatial clique ws; it varies across joints
-    vector_field_tf = TF.placeholder(TF.float32, shape=[None, None, None])  # placeholder for the vector fields
+    vector_field_tf = TF.compat.v1.placeholder(TF.float32, shape=[None, None, None])  # placeholder for the vector fields
 
     # Build the network
-    pn = PoseNet(dgp_cfg)
+    pn = PoseResnet(dgp_cfg)
     net, end_points = pn.extract_features(inputs)
     scope = "pose"
     reuse = None
     heads = {}
     # two convnets, one is the prediction network, the other is the local refinement network.
-    with TF.variable_scope(scope, reuse=reuse):
+    with TF.compat.v1.variable_scope(scope, reuse=reuse):
         heads["part_pred"] = prediction_layer(dgp_cfg, net, "part_pred", nj)
         heads["locref"] = prediction_layer(dgp_cfg, net, "locref_pred", nj * 2)
 
     # Read the 2D targets from pred
     pred = heads['part_pred']
     nx_out, ny_out = tf.shape(pred)[1], tf.shape(pred)[2]
-    targets_pred, confidencemap_softmax = argmax_2d_from_cm(pred, nj, dgp_cfg.gamma, dgp_cfg.gauss_len)
+    targets_pred, confidencemap_softmax = argmax_2d_from_cm(pred, nj, dgp_cfg['gamma'], dgp_cfg['gauss_len'])
     targets_pred_marker = TF.reshape(targets_pred, [-1, 2])  # 2d locations for all markers
     targets_pred_hidden_marker = TF.gather(targets_pred_marker,
                                            hidden_marker_pl)  # 2d locations for hidden markers, predicted targets from the network
@@ -964,12 +971,12 @@ def dgp_loss(data_batcher, dgp_cfg):
     target_expand = TF.expand_dims(TF.expand_dims(targets_all_marker, 2), 3)  # (nt*nj) x 2 x 1 x 1
 
     # 2d grid of the output
-    alpha_tf = TF.placeholder(tf.float32, shape=[2, None, None], name="2dgrid")
+    alpha_tf = TF.compat.v1.placeholder(tf.float32, shape=[2, None, None], name="2dgrid")
     alpha_expand = TF.expand_dims(alpha_tf, 0)  # 1 x 2 x nx_out x ny_out
 
     # normalize the Gaussian bump for the target so that the peak is 1, nt * nx_out * ny_out * nj
     targets_gauss = TF.exp(-TF.reduce_sum(TF.square(alpha_expand - target_expand), axis=1) /
-                           (2 * (dgp_cfg.lengthscale ** 2)))
+                           (2 * (dgp_cfg['lengthscale'] ** 2)))
     gauss_max = TF.reduce_max(TF.reduce_max(targets_gauss, [1]), [1]) + TF.constant(1e-5, TF.float32)
     gauss_max = TF.expand_dims(TF.expand_dims(gauss_max, [1]), [2])
     targets_gauss = targets_gauss / gauss_max
@@ -991,7 +998,7 @@ def dgp_loss(data_batcher, dgp_cfg):
     pred_v = TF.gather(pred, visible_marker_pl)  # output pred for visible markers
     pred_h = TF.gather(pred, hidden_marker_pl)  # output pred for hidden markers
 
-    if dgp_cfg.gm2 == 1:
+    if dgp_cfg['gm2'] == 1:
         # scale crossentropy loss terms by confidence
         pred_h_sigmoid = tf.sigmoid(pred_h)
         pgm_h1 = tf.reduce_max(tf.reduce_max(pred_h_sigmoid, [1]), [1])  # + EPSILON_tf
@@ -1000,9 +1007,9 @@ def dgp_loss(data_batcher, dgp_cfg):
         targets_gauss_h = targets_gauss_h * pgm_h2
         # scale network
         pred_h_scaled = pred_h_sigmoid * pgm_h2
-        pred_h_scaled1 = -tf.log(1 - pred_h_scaled + 1e-20) + tf.log(
+        pred_h_scaled1 = -tf.compat.v1.log(1 - pred_h_scaled + 1e-20) + tf.compat.v1.log(
             pred_h_scaled + 1e-20)
-    elif dgp_cfg.gm2 == 2:
+    elif dgp_cfg['gm2'] == 2:
         # scale crossentropy loss input by confidence
         pred_h_sigmoid = tf.sigmoid(pred_h)
         pgm_h1 = tf.reduce_max(tf.reduce_max(pred_h_sigmoid, [1]), [1])  # + EPSILON_tf
@@ -1013,24 +1020,24 @@ def dgp_loss(data_batcher, dgp_cfg):
         targets_gauss_h = targets_gauss_h  # *pgm_h2
         # scaled the network output
         pred_h_scaled = pred_h_sigmoid * pgm_h2
-        pred_h_scaled1 = -tf.log(1 - pred_h_scaled + 1e-20) + tf.log(
+        pred_h_scaled1 = -tf.compat.v1.log(1 - pred_h_scaled + 1e-20) + tf.compat.v1.log(
             pred_h_scaled + 1e-20)
-    elif dgp_cfg.gm2 == 0:
+    elif dgp_cfg['gm2'] == 0:
         pass
     else:
         raise Exception('Not implemented')
 
     # %%
     loss = {}
-    loss["visible_loss_pred"] = TF.losses.sigmoid_cross_entropy(targets_gauss_v, pred_v, 1.0)
-    if dgp_cfg.gm3 == 3:
-        loss["hidden_loss_pred"] = TF.losses.sigmoid_cross_entropy(targets_gauss_h, pred_h_scaled1,
+    loss["visible_loss_pred"] = TF.compat.v1.losses.sigmoid_cross_entropy(targets_gauss_v, pred_v, 1.0)
+    if dgp_cfg['gm3'] == 3:
+        loss["hidden_loss_pred"] = TF.compat.v1.losses.sigmoid_cross_entropy(targets_gauss_h, pred_h_scaled1,
                                                                    weights=(1 - pgm_h2)) * \
                                    n_visible_frames_total / n_hidden_frames_total * \
                                    n_hidden_frames_batch / n_visible_frames_batch * wn_hidden_tf / wn_visible_tf
 
-    elif dgp_cfg.gm3 == 0:
-        loss["hidden_loss_pred"] = TF.losses.sigmoid_cross_entropy(targets_gauss_h, pred_h, 1.0) * \
+    elif dgp_cfg['gm3'] == 0:
+        loss["hidden_loss_pred"] = TF.compat.v1.losses.sigmoid_cross_entropy(targets_gauss_h, pred_h, 1.0) * \
                                    n_visible_frames_total / n_hidden_frames_total * \
                                    n_hidden_frames_batch / n_visible_frames_batch * wn_hidden_tf / wn_visible_tf
     else:
@@ -1049,9 +1056,9 @@ def dgp_loss(data_batcher, dgp_cfg):
     locref_map_v = TF.gather(locref_map_reshape, visible_marker_pl)
     locref_mask_reshape = TF.reshape(TF.transpose(locref_mask, [0, 3, 1, 2]), [-1, 2, nx_out, ny_out])
     locref_mask_v = TF.gather(locref_mask_reshape, visible_marker_pl)
-
-    loss_func = losses.huber_loss if dgp_cfg.locref_huber_loss else TF.losses.mean_squared_error
-    loss['visible_loss_locref'] = dgp_cfg.locref_loss_weight * loss_func(locref_map_v, locref_pred_v, locref_mask_v)
+    
+    loss_func = tf.compat.v1.losses.huber_loss if dgp_cfg['locref_huber_loss'] else TF.compat.v1.losses.mean_squared_error
+    loss['visible_loss_locref'] = dgp_cfg['locref_loss_weight'] * loss_func(locref_map_v, locref_pred_v, locref_mask_v)
     total_loss = total_loss + loss['visible_loss_locref']
 
     # ------------------------------------------------------------------------------------
@@ -1063,7 +1070,7 @@ def dgp_loss(data_batcher, dgp_cfg):
     if nl > 0:
         S = TF.constant(S0, dtype=TF.float32)
         targets_all_marker_spatial = TF.reshape(TF.transpose(targets_all_marker_3c, [1, 2, 0]),
-                                                [nj, -1]) * dgp_cfg.stride + 0.5 * dgp_cfg.stride
+                                                [nj, -1]) * dgp_cfg['stride'] + 0.5 * dgp_cfg['stride']
         dist_targets = TF.sqrt(
             TF.reduce_sum(
                 TF.square(TF.reshape(TF.matmul(S, targets_all_marker_spatial), [nl, 2, -1])), [1]))
@@ -1076,7 +1083,7 @@ def dgp_loss(data_batcher, dgp_cfg):
         total_loss += loss['ws_loss']
 
     # Temporal clique
-    if dgp_cfg.wt > 0:
+    if dgp_cfg['wt'] > 0:
         targets_all_marker_temporal = targets_all_marker_3c * dgp_cfg.stride + 0.5 * dgp_cfg.stride
         targets_all_marker_temporal0 = targets_all_marker_temporal[:-1, :, :]
         targets_all_marker_temporal1 = targets_all_marker_temporal[1:, :, :]
