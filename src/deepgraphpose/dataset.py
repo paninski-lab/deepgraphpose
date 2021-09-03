@@ -835,11 +835,12 @@ class MultiDataset:
         if video_sets is None:
             self.proj_config['video_path'] = self.proj_config['video_sets']  # backwards compat
         else:
+            print(self.proj_config['video_sets'])
             video_set_keys = self.proj_config['video_sets'].keys()
             video_set_keys = [split(v)[-1] for v in video_set_keys]
-            #print('video_set_keys: ', video_set_keys)
+            print('video_set_keys: ', video_set_keys)
             video_set_input = [split(v)[-1] for v in video_sets]
-            #print('video_set_input: ', video_set_input)
+            print('video_set_input: ', video_set_input)
             if set(video_set_keys)==set(video_set_input):
                 self.proj_config['video_path'] = self.proj_config['video_sets']
             else:
@@ -861,9 +862,11 @@ class MultiDataset:
 
         # create a dataset for each video
         self.video_files = self.proj_config['video_sets'].keys()
+        print(self.proj_config['video_sets'])
         assert len(self.video_files) > 0
         self.batch_ratios = []
         for video_file in self.video_files:
+            print(video_file)
             self.datasets.append(Dataset(video_file, self.dlc_config, self.paths))
             self.batch_ratios.append(len(self.datasets[-1].idxs['vis']['train']))
         self.batch_ratios = np.array(self.batch_ratios) / np.sum(self.batch_ratios)
