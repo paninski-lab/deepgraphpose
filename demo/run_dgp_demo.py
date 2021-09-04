@@ -107,8 +107,7 @@ def get_model_cfg_path(base_path, dtype):
 
 def get_init_weights_path(base_path):
     return join(
-        base_path, 'src', 'DeepLabCut', 'deeplabcut', 'pose_estimation_tensorflow',
-        'models', 'pretrained', 'resnet_v1_50.ckpt')
+        base_path, 'resnet_v1_50.ckpt')
 
 
 if __name__ == '__main__':
