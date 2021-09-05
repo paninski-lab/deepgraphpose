@@ -111,7 +111,7 @@ def create_labels(task, date, overwrite_flag=False, check_labels=False, verbose=
         frames2pick = np.sort(
             np.random.choice(frames_index_keep, cfg["numframes2pick"], replace=False)
         )
-        local_extract_frames(path_config_file, frames2pick)
+        local_extract_frames(path_config_file, frames2pick, crop=True)
         frames = os.listdir(frames_dir)
 
     #%%

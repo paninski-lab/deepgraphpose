@@ -112,7 +112,7 @@ def create_annotated_movie(clip, df_x, df_y, mask_array=None, dotsize=5, colorma
 
         return frame
 
-    clip_marked = clip.fl(add_marker)
+    clip_marked = clip.transform(add_marker)
 
     clip_marked.write_videofile(str(filename), codec="mpeg4", fps=fps, bitrate="1000k")
     clip_marked.close()

@@ -241,7 +241,7 @@ trainingsetindex=0):
         # Save snapshot
         if (it % save_iters == 0 and it != 0) or it == max_iter:
             model_name = dlc_cfg['snapshot_prefix'] + '-step' + str(
-                step) + '-'
+                step)
             saver.save(sess, model_name, global_step=it)
             if it == max_iter:
                 model_name = dlc_cfg['snapshot_prefix'] + '-step' + str(
@@ -363,7 +363,7 @@ def fit_dgp_labeledonly(
     dgp_cfg['aug'] = aug  # data augmentation
 
     # skip this DGP with labeled frames only step if it's already done.
-    model_name = dgp_cfg['snapshot_prefix'] + '-step1-final--0.index'
+    model_name = dgp_cfg['snapshot_prefix'] + '-step1-final-0.index'
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP with labeled frames has already been run.', flush=True)
         return None
@@ -537,11 +537,11 @@ def fit_dgp_labeledonly(
 
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
-            model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) + '-'
+            model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step)
             saver.save(sess, model_name, global_step=it)
             saver.save(sess, model_name, global_step=0)
             if (it + 1) == maxiters:
-                model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) + '-final-'
+                model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) + '-final'
                 saver.save(sess, model_name, global_step=0)
 
     time_end = time.time()
@@ -552,8 +552,8 @@ def fit_dgp_labeledonly(
 
 
 def fit_dgp(
-        snapshot, dlcpath, batch_size=10, shuffle=1, step=2, saveiters=1000, displayiters=5,
-        maxiters=200000, ns=10, nc=2048, n_max_frames=2000, gm2=0, gm3=0, nepoch=100, wt=0, aug=True,
+        snapshot, dlcpath, batch_size=1, shuffle=1, step=2, saveiters=500, displayiters=10,
+        maxiters=30000, ns=10, nc=2048, n_max_frames=2000, gm2=0, gm3=0, nepoch=100, wt=0, aug=True,
         debug='', trainingsetindex=0):
     """Run DGP.
     Parameters
@@ -659,7 +659,7 @@ def fit_dgp(
     dgp_cfg['aug'] = aug  # data augmentation
 
     # skip this DGP step if it's already done.
-    model_name = dgp_cfg['snapshot_prefix'] + '-step{}{}-final--0.index'.format(step, debug)
+    model_name = dgp_cfg['snapshot_prefix'] + '-step{}-final-0.index'.format(step)
     if os.path.isfile(model_name):
         print(model_name, '  exists! DGP has already been run.', flush=True)
         return None
@@ -836,12 +836,12 @@ def fit_dgp(
 
         # Save snapshot
         if (it % save_iters == 0) or (it + 1) == maxiters:
-            model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) + '{}'.format(debug)+ '-'
+            model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step)
             #print('Storing model {}'.format(model_name))
             saver.save(sess, model_name, global_step=it)
             saver.save(sess, model_name, global_step=0)
             if (it + 1) == maxiters:
-                model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) + '{}'.format(debug) +'-final-'
+                model_name = dgp_cfg['snapshot_prefix'] + '-step' + str(step) +'-final'
                 #print('Storing model {}'.format(model_name))
                 saver.save(sess, model_name, global_step=0)
 
