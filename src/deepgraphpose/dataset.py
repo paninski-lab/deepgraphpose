@@ -852,6 +852,7 @@ class MultiDataset:
             join(self.proj_config['project_path'], key): val
             for key, val in self.proj_config['video_sets'].items()
         }
+        print(self.proj_config['video_sets'])
         print("project path")
         print(self.proj_config['project_path'])
 
