@@ -203,7 +203,7 @@ if __name__ == '__main__':
                                 dlcpath,
                                 shuffle=shuffle,
                                 step=1,
-                                maxiters=2,
+                                maxiters=1000,
                                 displayiters=1)
         else:
             fit_dgp_labeledonly(snapshot,
