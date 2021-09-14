@@ -148,7 +148,7 @@ if __name__ == '__main__':
     batch_size = input_params.batch_size
     test = input_params.test
 
-    split,splitlength = input_params.split,input_params.splitlength 
+    splitflag,splitlength = input_params.split,input_params.splitlength 
 
     update_configs = False
     if dlcpath == join('data','Reaching-Mackenzie-2018-08-30'):
@@ -287,13 +287,13 @@ if __name__ == '__main__':
             os.makedirs(video_pred_path)
 
         print('video_sets', video_sets, flush=True)
-        if split: 
+        if splitflag: 
             video_cut_path = str(Path(dlcpath) / 'videos_cut')
             if not os.path.exists(video_cut_path):
                 os.makedirs(video_cut_path)
             clip_sets = []
             for v in video_sets: 
-               clip_sets.extend(split_video(v,splitlength,suffix = "demo",video_cut_path))
+               clip_sets.extend(split_video(v,int(splitlength),suffix = "demo",outputloc = video_cut_path))
             video_sets = clip_sets ## replace video_sets with clipped versions.   
 
         if test:
