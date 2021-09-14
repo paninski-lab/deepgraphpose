@@ -13,6 +13,13 @@ from pathlib import Path
 import sys
 import yaml
 
+import pandas as pd
+from deeplabcut.utils.video_processor import (
+    VideoProcessorCV as vp,
+)  # used to CreateVideo
+from deeplabcut.utils import auxiliaryfunctions, CreateVideo, visualization
+
+
 if sys.platform == 'darwin':
     import wx
     if int(wx.__version__[0]) > 3:
@@ -197,6 +204,17 @@ if __name__ == '__main__':
         '''
         , flush=True)
     cfg = auxiliaryfunctions.read_config(cfg_yaml)
+    bodyparts2connect = cfg["skeleton"]
+    skeleton_color = cfg["skeleton_color"]
+    draw_skeleton = True
+    color_by = 'bodypart'
+    displaycropped = False
+    bodyparts = auxiliaryfunctions.IntersectionofBodyPartsandOnesGivenbyUser(
+        cfg, "all"
+    )
+    cropping = False
+    x1, x2, y1, y2 = 0,0,0,0
+    trailpoints = 0
     if not (os.path.exists(video_path)):
         print(video_path + " does not exist!")
         video_sets = list(cfg['video_sets'])
@@ -217,4 +235,33 @@ if __name__ == '__main__':
                  proj_cfg_file=str(cfg_yaml),
                  dgp_model_file=str(snapshot),
                  shuffle=shuffle)
-    
+        videooutname = video_file.split(".")[0] + "_dgp_labeled.mp4"
+        clip = vp(fname=video_file,sname=videooutname)
+        filepath = video_file.split(".")[0] + "_labeled.h5"
+        df = pd.read_hdf(filepath)
+
+        labeled_bpts = [
+            bp
+            for bp in df.columns.get_level_values("bodyparts").unique()
+            if bp in bodyparts
+        ]
+
+        CreateVideo(
+            clip,
+            df,
+            cfg["pcutoff"],
+            cfg["dotsize"],
+            cfg["colormap"],
+            labeled_bpts,
+            trailpoints,
+            cropping,
+            x1,
+            x2,
+            y1,
+            y2,
+            bodyparts2connect,
+            skeleton_color,
+            draw_skeleton,
+            displaycropped,
+            color_by,
+        )
