@@ -160,7 +160,14 @@ if __name__ == '__main__':
     snapshot = input_params.snapshot
     video_path = input_params.video_path
 
+
+    print(dlcpath)
+
+
     cfg_yaml =  dlcpath / 'config.yaml'
+
+
+    print(cfg_yaml)
 
 
 
