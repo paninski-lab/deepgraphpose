@@ -11,6 +11,7 @@ from skimage.draw import circle
 from skimage.util import img_as_ubyte
 from tqdm import tqdm
 from pathlib import Path
+from os.path import isfile, join, split
 
 vers = tf.__version__.split('.')
 if int(vers[0]) == 1 and int(vers[1]) > 12:
@@ -214,7 +215,7 @@ def setup_dgp_eval_graph(dlc_cfg, dgp_model_file, loc_ref=False, gauss_len=1, ga
 
 
 def estimate_pose(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle=1,
-                  save_pose=True, save_str='', new_size=None):
+                  save_pose=True, save_str='', new_size=None, crop_size=None):
     """Estimate pose on an arbitrary video.
 
     Parameters
@@ -238,6 +239,161 @@ def estimate_pose(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle
     -------
     dict
 
+    """
+    from deepgraphpose.utils_model import get_train_config
+
+    f = os.path.basename(video_file).rsplit('.', 1)
+    save_file = join(output_dir, f[0] + '_labeled%s' % save_str)
+    if os.path.exists(save_file + '.csv'):
+        print('labels already exist! video at %s will not be processed' % video_file)
+        return save_file + '.csv'
+
+    # -------------------
+    # loading
+    # -------------------
+    # load video
+    print('initializing video clip...', end='')
+    video_clip = VideoFileClip(str(video_file))
+    n_frames = np.ceil(video_clip.fps * video_clip.duration).astype('int')
+    print('done')
+
+    # load dlc project config file
+    print('loading dlc project config...', end='')
+    with open(proj_cfg_file, 'r') as stream:
+        proj_config = yaml.safe_load(stream)
+    proj_config['video_path'] = None
+    dlc_cfg = get_train_config(proj_config, shuffle=shuffle)
+    print('done')
+
+    # -------------------
+    # extract pose
+    # -------------------
+    try:
+        dlc_cfg.net_type = 'resnet_50'
+        sess, mu_n, _, scmap, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
+    except:
+        dlc_cfg.net_type = 'resnet_101'
+        sess, mu_n, _, scmap, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
+
+    print('\n')
+    """
+    pbar = tqdm(total=n_frames, desc='processing video frames')
+    markers = np.zeros((n_frames, dlc_cfg.num_joints, 2))
+    likelihoods = np.zeros((n_frames, dlc_cfg.num_joints))
+    for i, frame in enumerate(video_clip.iter_frames()):
+        # get resnet output
+        ff = img_as_ubyte(frame)
+        mu_n_batch = sess.run(mu_n, feed_dict={inputs: ff[None, :, :, :]})
+        markers[i] = mu_n_batch * dlc_cfg.stride + 0.5 * dlc_cfg.stride
+        likelihoods[i] = 0.5
+
+        pbar.update(1)
+    """
+    # %%
+    nj = dlc_cfg.num_joints
+    nx, ny = video_clip.size
+    nx_out, ny_out = int((nx - dlc_cfg.stride / 2) / dlc_cfg.stride + 1) + 5, int(
+        (ny - dlc_cfg.stride / 2) / dlc_cfg.stride + 1) + 5
+
+    # %%
+    markers = np.zeros((n_frames, dlc_cfg.num_joints, 2))
+
+    mu_likelihoods = np.zeros((n_frames, nj, 2)).astype('int')
+    likelihoods = np.zeros((n_frames, nj))
+    offset_mu_jj = 0
+
+    pbar = tqdm(total=n_frames, desc='processing video frames')
+    for ii, frame in enumerate(video_clip.iter_frames()):
+        frame = Image.fromarray(frame)
+        if new_size is not None:
+            scale_x = frame.width / new_size[1]
+            scale_y = frame.height / new_size[0]
+            # width, height
+            frame = frame.resize(size=(new_size[1], new_size[0]))
+        else:
+            scale_x = 1
+            scale_y = 1
+        if crop_size is not None:
+            # crop
+            frame = frame.crop(crop_size)
+            xmin = crop_size[0]
+            ymin = crop_size[1]
+        else:
+            xmin = 0
+            ymin = 0
+
+        frame = np.asarray(frame)
+        ff = img_as_ubyte(frame)
+
+        mu_n_batch, scmap_np = sess.run([mu_n, scmap], feed_dict={inputs: ff[None, :, :, :]})
+        markers[ii] = mu_n_batch[0]
+        softmaxtensor = scmap_np[0]
+        for jj_idx in range(nj):
+            mu_jj = markers[ii, jj_idx]
+            ends_floor = np.floor(mu_jj).astype('int') - offset_mu_jj
+            ends_ceil = np.ceil(mu_jj).astype('int') + 1 + offset_mu_jj
+            sigmoid_pred_np_jj = np.exp(softmaxtensor[:, :, jj_idx]) / \
+                                 (np.exp(softmaxtensor[:, :, jj_idx]) + 1)
+            spred_centered = sigmoid_pred_np_jj[
+                             ends_floor[0]:ends_ceil[0], ends_floor[1]:ends_ceil[1]]
+            mu_likelihoods[ii, jj_idx] = np.unravel_index(np.argmax(spred_centered),
+                                                          spred_centered.shape)
+            mu_likelihoods[ii, jj_idx] += [ends_floor[0], ends_floor[1]]
+            likelihoods[ii, jj_idx] = sigmoid_pred_np_jj[
+                int(mu_likelihoods[ii, jj_idx][0]), int(mu_likelihoods[ii, jj_idx][1])]
+
+        pbar.update(1)
+
+    pbar.close()
+    sess.close()
+    video_clip.close()
+
+    # %%
+    xr = markers[:, :, 1] * dlc_cfg.stride + 0.5 * dlc_cfg.stride  # T x nj
+    yr = markers[:, :, 0] * dlc_cfg.stride + 0.5 * dlc_cfg.stride
+    # %%
+    # true xr
+    xr *= scale_x
+    yr *= scale_y
+    print('Finished collecting markers')
+    print('Storing data')
+
+    # -------------------
+    # save labels
+    # -------------------
+    labels = {'x': xr, 'y': yr, 'likelihoods': likelihoods}
+
+    # convert to DLC-like csv/hdf5
+    if save_pose:
+        if not Path(save_file).parent.exists():
+            os.makedirs(os.path.dirname(save_file))
+        export_pose_like_dlc(labels, os.path.basename(dgp_model_file),
+                             dlc_cfg.all_joints_names, save_file)
+    return labels
+
+
+def estimate_pose_obsolete(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle=1,
+                  save_pose=True, save_str='', new_size=None):
+    """Estimate pose on an arbitrary video.
+    Parameters
+    ----------
+    proj_cfg_file : str, optional
+        dlc project config file (.yaml) (if `label_dir` is None)
+    dgp_model_file : str, optional
+        dgp model weights; .ckpt if fitting full resnet, .npy if only fitting final conv layer
+    video_file : str
+        video to label
+    output_dir : str
+        output directory to store labeled video
+    shuffle : int, optional
+        dlc shuffle number
+    save_pose : bool, optional
+        True to save out pose in csv/hdf5 file
+    save_str : str, optional
+        additional string to append to labeled video file name
+    Returns
+    -------
+    dict
     """
     from deepgraphpose.utils_model import get_train_config
 
@@ -285,7 +441,6 @@ def estimate_pose(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle
         mu_n_batch = sess.run(mu_n, feed_dict={inputs: ff[None, :, :, :]})
         markers[i] = mu_n_batch * dlc_cfg.stride + 0.5 * dlc_cfg.stride
         likelihoods[i] = 0.5
-
         pbar.update(1)
     """
     # %%
@@ -399,7 +554,7 @@ def estimate_pose0(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffl
     from deepgraphpose.utils_model import get_train_config
 
     f = os.path.basename(video_file).rsplit('.', 1)
-    save_file = os.path.join(output_dir, f[0] + '_labeled%s' % save_str)
+    save_file = join(output_dir, f[0] + '_labeled%s' % save_str)
     if os.path.exists(save_file + '.csv'):
         print('labels already exist! video at %s will not be processed' % video_file)
         return save_file + '.csv'
@@ -566,7 +721,7 @@ def evaluate_dgp(proj_cfg_file, dgp_model_file, shuffle=1, loc_ref=None,
     # deeplabcut.pose_estimation_tensorflow.evaluate.evaluate_network
     trainingsetfolder = auxiliaryfunctions.GetTrainingSetFolder(proj_config)
     DLCscorer = 'DGP'
-    Data = pd.read_hdf(os.path.join(proj_config["project_path"], str(trainingsetfolder),
+    Data = pd.read_hdf(join(proj_config["project_path"], str(trainingsetfolder),
         'CollectedData_' + proj_config["scorer"] + '.h5'), 'df_with_missing')
     # get list of body parts to evaluate network for
     comparisonbodyparts = auxiliaryfunctions.IntersectionofBodyPartsandOnesGivenbyUser(
@@ -577,14 +732,14 @@ def evaluate_dgp(proj_cfg_file, dgp_model_file, shuffle=1, loc_ref=None,
 
     # Load meta data
     data, trainIndices, testIndices, trainFraction = auxiliaryfunctions.LoadMetadata(
-        os.path.join(proj_config['project_path'], metadatafn))
+        join(proj_config['project_path'], metadatafn))
 
     nj = len(dlc_cfg['all_joints_names'])
     Numimages = len(Data.index)
     PredicteData = np.ones((Numimages, 3 * nj))
     print("Analyzing data...")
     for imageindex, imagename in tqdm(enumerate(Data.index)):
-        image = imread(os.path.join(proj_config['project_path'], imagename), mode='RGB')
+        image = imread(join(proj_config['project_path'], imagename), mode='RGB')
 
         if loc_ref:
             if loc_ref_calc.lower() == 'dlc':
@@ -693,10 +848,11 @@ def plot_dgp(video_file, output_dir='', label_dir=None, proj_cfg_file=None,
 
     """
     f = os.path.basename(video_file).rsplit('.', 1)
-    save_file = os.path.join(output_dir, f[0] + '_labeled%s.mp4' % save_str)
+    save_file = join(output_dir, f[0] + '_labeled%s.mp4' % save_str)
+
     if label_dir is None:
         label_dir = output_dir
-    label_file = os.path.join(label_dir, f[0] + '_labeled%s.csv' % save_str)
+    label_file = join(label_dir, f[0] + '_labeled%s.csv' % save_str)
 
     # export labels if necessary
     if not os.path.exists(label_file):

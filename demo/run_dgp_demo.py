@@ -8,7 +8,7 @@
 import argparse
 import os
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, split
 from pathlib import Path
 import sys
 import yaml
@@ -21,7 +21,7 @@ if sys.platform == 'darwin':
 os.environ["DLClight"] = "True"
 os.environ["Colab"] = "True"
 from deeplabcut.utils import auxiliaryfunctions
-
+from deepgraphpose.contrib.segment_videos import split_video
 from deepgraphpose.models.fitdgp import fit_dlc, fit_dgp, fit_dgp_labeledonly
 from deepgraphpose.models.fitdgp_util import get_snapshot_path
 from deepgraphpose.models.eval import plot_dgp
@@ -88,7 +88,7 @@ def update_config_files(dlcpath):
     base_path = os.getcwd()
 
     # project config
-    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
+    proj_cfg_path = join(base_path, dlcpath, 'config.yaml')
     with open(proj_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
@@ -106,7 +106,7 @@ def update_config_files(dlcpath):
     with open(model_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['init_weights'] = get_init_weights_path(base_path)
-        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
+        yaml_cfg['project_path'] = join(base_path, dlcpath)
     with open(model_cfg_path, 'w') as f:
         yaml.dump(yaml_cfg, f)
 
@@ -122,20 +122,20 @@ def update_config_files(dlcpath):
     with open(model_cfg_path, 'w') as f:
         yaml.dump(yaml_cfg, f)
 
-    return os.path.join(base_path, dlcpath)
+    return join(base_path, dlcpath)
 
 
 def return_configs():
     base_path = os.getcwd()
-    dlcpath = 'data/Reaching-Mackenzie-2018-08-30'
+    dlcpath = join('data','Reaching-Mackenzie-2018-08-30')
 
     # project config
-    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
+    proj_cfg_path = join(base_path, dlcpath, 'config.yaml')
     with open(proj_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
         yaml_cfg['project_path'] = dlcpath
-        video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
-        yaml_cfg['video_sets']['videos/reachingvideo1.avi'] = yaml_cfg['video_sets'].pop(video_loc)
+        video_loc = join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
+        yaml_cfg['video_sets'][join('videos','reachingvideo1.avi')] = yaml_cfg['video_sets'].pop(video_loc)
     with open(proj_cfg_path, 'w') as f:
         yaml.dump(yaml_cfg, f)
 
@@ -158,7 +158,7 @@ def return_configs():
 
 
 def get_model_cfg_path(base_path, dtype):
-    return os.path.join(
+    return join(
         base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
         dtype, 'pose_cfg.yaml')
 
@@ -172,7 +172,7 @@ def get_model_cfg_path_general(base_path, dlcpath, dtype, projectname):
 
 
 def get_init_weights_path(base_path):
-    return os.path.join(
+    return join(
         base_path, 'src', 'DeepLabCut', 'deeplabcut', 'pose_estimation_tensorflow',
         'models', 'pretrained', 'resnet_v1_50.ckpt')
 
@@ -202,6 +202,8 @@ if __name__ == '__main__':
         default=10,
         help="size of the batch, if there are memory issues, decrease it value")
     parser.add_argument("--test", action='store_true', default=False)
+    parser.add_argument("--split", action = "store_true",help = "whether or not we should run inference on chopped up videos")
+    parser.add_argument("--splitlength", default = 6000, help= "number of frames in block if splitting videos. ")
 
     input_params = parser.parse_known_args()[0]
     print(input_params)
@@ -211,6 +213,7 @@ if __name__ == '__main__':
     dlcsnapshot = input_params.dlcsnapshot
     batch_size = input_params.batch_size
     test = input_params.test
+    splitflag,splitlength = input_params.split,input_params.splitlength 
 
     # update config files
     dlcpath = update_config_files_general(dlcpath,shuffle)
@@ -336,7 +339,7 @@ if __name__ == '__main__':
             video_sets = list(cfg['video_sets'])
         else:
             video_sets = [
-                video_path + '/' + f for f in listdir(video_path)
+                join(video_path, f) for f in listdir(video_path)
                 if isfile(join(video_path, f)) and (
                         f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find(
                     'mkv') > 0)
@@ -347,19 +350,29 @@ if __name__ == '__main__':
             os.makedirs(video_pred_path)
 
         print('video_sets', video_sets, flush=True)
+        if splitflag: 
+            video_cut_path = str(Path(dlcpath) / 'videos_cut')
+            if not os.path.exists(video_cut_path):
+                os.makedirs(video_cut_path)
+            clip_sets = []
+            for v in video_sets: 
+               clip_sets.extend(split_video(v,int(splitlength),suffix = "demo",outputloc = video_cut_path))
+            video_sets = clip_sets ## replace video_sets with clipped versions.   
 
         if test:
             for video_file in [video_sets[0]]:
                 from moviepy.editor import VideoFileClip
-                clip =VideoFileClip(str(video_file))
+                clip = VideoFileClip(str(video_file))
                 if clip.duration > 10:
                     clip = clip.subclip(10)
-                #video_file_name = video_file.rsplit('/', 1)[-1].rsplit('.',1)[0] + '.mp4'
-                video_file_name = os.path.splitext(video_file)[0] +"test"+ ".mp4" 
-                print('\nwriting {}'.format(video_file_name))
-                clip.write_videofile(video_file_name)
-                plot_dgp(str(video_file_name),
-                         str(video_pred_path),
+
+                video_file_tmp = split(video_file)[-1]
+                video_file_name = video_file_tmp.rsplit('.',1)[0] + '.mp4'
+                clip.write_videofile(join(video_pred_path,video_file_name))
+                output_dir = video_pred_path
+                print('\nwriting {} to {}'.format(video_file_name, output_dir))
+                plot_dgp(video_file=str(join(video_pred_path,video_file_name)),
+                         output_dir=output_dir,
                          proj_cfg_file=str(cfg_yaml),
                          dgp_model_file=str(snapshot_path),
                          shuffle=shuffle)

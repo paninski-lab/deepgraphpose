@@ -59,8 +59,8 @@ def local_extract_frames(
             ret, frame = cap.read()
             if ret:
                 image = img_as_ubyte(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                img_name = (str(output_path) + "/img" +
-                            str(index).zfill(indexlength) + ".png")
+                img_name = str(output_path / "img" + str(index).zfill(indexlength) + ".png")
+
                 if crop:
                     io.imsave(
                         img_name,
@@ -76,8 +76,7 @@ def local_extract_frames(
         for index in frames2pick:
             try:
                 image = img_as_ubyte(clip.get_frame(index * 1.0 / clip.fps))
-                img_name = (str(output_path) + "/img" +
-                            str(index).zfill(indexlength) + ".png")
+                img_name = str(output_path / "img" + str(index).zfill(indexlength) + ".png")
                 io.imsave(img_name, image)
                 if np.var(image) == 0:  # constant image
                     print(
@@ -108,8 +107,8 @@ def local_extract_frames_md(
     rel_video_path = str(Path.resolve(Path(video)))
     videoname = Path(rel_video_path).name
 
-    model_video = str(Path(config_path).parent) + '/videos/' + videoname
-    output_path = Path(config_path).parents[0] / "labeled-data" / Path(
+    model_video = str(Path(config_path).parent / 'videos' / videoname)
+    output_path = Path(config_path).parents[0] / 'labeled-data' / Path(
         video).stem
     coords = cfg['video_sets'][model_video]['crop'].split(',')
 
@@ -130,8 +129,7 @@ def local_extract_frames_md(
             ret, frame = cap.read()
             if ret:
                 image = img_as_ubyte(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                img_name = (str(output_path) + "/img" +
-                            str(index).zfill(indexlength) + ".png")
+                img_name = str(output_path / str("img" + str(index).zfill(indexlength) + ".png"))
                 if crop:
                     io.imsave(
                         img_name,
@@ -147,8 +145,7 @@ def local_extract_frames_md(
         for index in frames2pick:
             try:
                 image = img_as_ubyte(clip.get_frame(index * 1.0 / clip.fps))
-                img_name = (str(output_path) + "/img" +
-                            str(index).zfill(indexlength) + ".png")
+                img_name = str(output_path / "img" + str(index).zfill(indexlength) + ".png")
                 io.imsave(img_name, image)
                 if np.var(image) == 0:  # constant image
                     print(

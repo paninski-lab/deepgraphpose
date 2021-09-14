@@ -15,7 +15,7 @@ import logging
 import time
 import os
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, split
 from pathlib import Path
 from random import randint
 
@@ -103,7 +103,8 @@ trainingsetindex=0):
         snapshot = dlc_cfg.net_type.split('_')[0] + '_v1_' + dlc_cfg.net_type.split('_')[1] + '.ckpt'
         init_weights = str(
             parent_path /
-            ('pose_estimation_tensorflow/models/pretrained/' + snapshot))
+            join('pose_estimation_tensorflow', 'models', 'pretrained', snapshot))
+
     dlc_cfg.init_weights = init_weights
     dlc_cfg.pos_dist_thresh = 8
     dlc_cfg.output_stride = 16
@@ -301,10 +302,11 @@ def fit_dgp_labeledonly(
         video_sets = list(cfg['video_sets'])
     else:
         video_sets = [
-            video_path + '/' + f for f in listdir(video_path)
+            join(video_path, f) for f in listdir(video_path)
             if isfile(join(video_path, f)) and (
                     f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find('mkv') > 0)
         ]
+    print('video_sets: ', video_sets)
 
     # structure info
     bodyparts = cfg['bodyparts']
@@ -476,7 +478,7 @@ def fit_dgp_labeledonly(
         wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg.wt
 
         # data augmentation for visible frames
-        if dgp_cfg.aug and dgp_cfg.wt == 0:
+        if dgp_cfg.aug and dgp_cfg.wt == 0 and len(visible_frame_within_batch) > 0:
             all_data_batch, joint_loc = data_aug(all_data_batch, visible_frame_within_batch, joint_loc, pipeline, dgp_cfg)
 
         locref_targets_batch, locref_mask_batch = coord2map(pdata, joint_loc, nx_out, ny_out, nj)
@@ -595,10 +597,11 @@ def fit_dgp(
         video_sets = list(cfg['video_sets'])
     else:
         video_sets = [
-            video_path + '/' + f for f in listdir(video_path)
+            join(video_path, f) for f in listdir(video_path)
             if isfile(join(video_path, f)) and (
                     f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find('mkv') > 0)
         ]
+    print('video_sets: ', video_sets)
 
     # structure info
     bodyparts = cfg['bodyparts']
@@ -722,7 +725,7 @@ def fit_dgp(
     # ------------------------------------------------------------------------------------
     batch_ind_all = gen_batch(visible_frame_total, hidden_frame_total, all_frame_total, dgp_cfg, maxiters)
     save_iters = np.int(saveiters / dgp_cfg.batch_size)
-    maxiters = batch_ind_all.shape[0]
+    maxiters = len(batch_ind_all)
 
     pdata = PoseDataset(dgp_cfg)
     data_batcher.reset()
@@ -772,7 +775,7 @@ def fit_dgp(
         wt_batch = np.ones(nt_batch - 1, ) * dgp_cfg.wt
 
         # data augmentation for visible frames
-        if dgp_cfg.aug and dgp_cfg.wt == 0:
+        if dgp_cfg.aug and dgp_cfg.wt == 0 and len(visible_frame_within_batch) > 0:
             all_data_batch, joint_loc = data_aug(all_data_batch, visible_frame_within_batch, joint_loc, pipeline, dgp_cfg)
 
         locref_targets_batch, locref_mask_batch = coord2map(pdata, joint_loc, nx_out, ny_out, nj)

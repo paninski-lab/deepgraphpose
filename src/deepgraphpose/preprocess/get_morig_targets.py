@@ -6,6 +6,7 @@ hardcoded version - try to see if we can get the reconstructions to match
 
 import numpy as np
 import os
+from os.path import isfile, join, split
 from pathlib import Path
 import scipy.io as sio
 from PoseDataLoader import DataLoader
@@ -15,7 +16,7 @@ import argparse
 #%%
 
 def extract_frame_num(x):
-    return int(x.split("/")[-1].split(".")[0][3:])
+    return int(split(x)[-1].split(".")[0][3:])
 
 
 #%%
@@ -59,7 +60,7 @@ def get_targets(task, date, shuffle):
     nx = nxraw//4
     ny = nyraw//4
     #%%
-    extract_frame_num = lambda x: int(x.split("/")[-1].split(".")[0][3:])
+    extract_frame_num = lambda x: int(split(x)[-1].split(".")[0][3:])
     frame_ids = []
     # frame_imgs = []
     counter = 0

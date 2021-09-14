@@ -15,6 +15,7 @@ from moviepy.editor import VideoFileClip
 from skimage.util import img_as_ubyte
 from tensorflow.python.util import deprecation
 from tqdm import tqdm
+from os.path import isfile, join, split
 
 deprecation._PRINT_DEPRECATION_WARNINGS = False
 
@@ -273,8 +274,12 @@ def coord2map(pdata, joint_loc, nx_out, ny_out, nj):
 def get_frame_idxs_from_train_mat(data_array, video):
     idxs = []
     for dat in data_array:
-        idx = int(dat[0][0].rsplit('/', 1)[-1][3:].split('.')[0])
-        if dat[0][0].find('/' + video + '/') > -1:
+        idx = int(split(dat[0][0])[-1][3:].split('.')[0])
+
+        dat00 = os.path.normpath(dat[0][0])
+        dat00 = dat00.split(os.sep)
+
+        if video in dat00:
             idxs.append(idx)
     return np.sort(idxs)
 
@@ -321,14 +326,15 @@ class Dataset:
         self.nx_out, self.ny_out = self._compute_pred_dims()  # x, y dims of model output
 
         # load manual labels
-        filename = os.path.join(self.dlc_config['project_path'],
+        filename = join(self.dlc_config['project_path'],
                                 self.dlc_config['dataset'])
         data = sio.loadmat(filename)['dataset'][0]
         idxs_train = get_frame_idxs_from_train_mat(data, self.video_name)
-        print(self.video_name)
-        print(idxs_train)
+        print('### video name: ', self.video_name)
+        print('### idxs_train: ', idxs_train)
         idxs_val = get_frame_idxs_val(dlc_config, idxs_train)
-        assert len(idxs_train) > 0
+        print('### idxs_val: ', idxs_val)
+        #assert len(idxs_train) > 0
         self.idxs = {'vis': {'train': idxs_train, 'val': idxs_val}}
 
         self.curr_batch = 0
@@ -379,9 +385,8 @@ class Dataset:
 
         from deepgraphpose.models.fitdgp_util import find_hidden_markers, find_visible_markers, \
             find_nan_ind
-
         self.paths['batched_data'] = batches_path
-        video_name = str(self.video_path).split('/')[-1]
+        video_name = split(str(self.video_path))[-1]
         self.batch_key = build_batch_key(**batch_info)
         self.paths['batched_data_hdf5'] = batches_path / str(
             '%s__%s.hdf5' % (video_name.split('.')[0], self.batch_key))
@@ -512,7 +517,7 @@ class Dataset:
     def _find_good_hidden_frames(self, pv_idxs, batch_info):
 
         # see if frames have been previously stored
-        video_name = str(self.video_path).split('/')[-1]
+        video_name = split(str(self.video_path))[-1]
         idxs_file = self.paths['batched_data'] / str(
             '%s__%s_idxs.npy' % (video_name.split('.')[0], self.batch_key))
 
@@ -595,7 +600,7 @@ class Dataset:
         stride = dlc_config['stride']
 
         def extract_frame_num(img_path):
-            return int(img_path.rsplit('/', 1)[-1][3:].split('.')[0])
+            return int(split(img_path)[-1][3:].split('.')[0])
 
         frame_idxs = []
         joinss = []
@@ -615,7 +620,9 @@ class Dataset:
 
             im_path = data[data_keys[5]].im_path
             # skip if frame belongs to another video
-            if im_path.find('/' + self.video_name + '/') == -1:
+            im_path_split = os.path.normpath(im_path).split(os.sep)
+            if self.video_name not in im_path_split:
+            #if im_path.find('/' + self.video_name + '/') == -1:
                 continue
             # skip if image has already been processed
             frame_idx = extract_frame_num(im_path)
@@ -830,11 +837,20 @@ class MultiDataset:
         if video_sets is None:
             self.proj_config['video_path'] = self.proj_config['video_sets']  # backwards compat
         else:
-            self.proj_config['video_path'] = video_sets  # backwards compat
+            video_set_keys = self.proj_config['video_sets'].keys()
+            video_set_keys = [split(v)[-1] for v in video_set_keys]
+            #print('video_set_keys: ', video_set_keys)
+            video_set_input = [split(v)[-1] for v in video_sets]
+            #print('video_set_input: ', video_set_input)
+            if set(video_set_keys)==set(video_set_input):
+                self.proj_config['video_path'] = self.proj_config['video_sets']
+            else:
+                self.proj_config['video_path'] = {v: {} for v in video_sets}  # backwards compat
+                self.proj_config['video_sets'] = {v: {} for v in video_sets}
 
         # update video paths from relative to absolute
         self.proj_config['video_sets'] = {
-            os.path.join(self.proj_config['project_path'], key): val
+            join(self.proj_config['project_path'], key): val
             for key, val in self.proj_config['video_sets'].items()
         }
 
@@ -853,7 +869,6 @@ class MultiDataset:
             self.datasets.append(Dataset(video_file, self.dlc_config, self.paths))
             self.batch_ratios.append(len(self.datasets[-1].idxs['vis']['train']))
         self.batch_ratios = np.array(self.batch_ratios) / np.sum(self.batch_ratios)
-
         # collect info about datasets
         self.n_datasets = len(self.datasets)
         self.nj = self.datasets[0].nj
@@ -932,6 +947,7 @@ class MultiDataset:
         self.n_hidden_frames_total = 0  # selected hidden (unlabeled) frames
         self.n_frames_total = 0  # labeled + selected hidden + temporal windows
         for i, dataset in enumerate(self.datasets):
+            print('Video: ', dataset.video_name, ' has ', len(dataset.idxs['pv']), ' visible frames selected; ', len(dataset.idxs['ph']), ' hidden frames selected.')
             self.n_visible_frames_total += len(dataset.idxs['pv'])
             self.n_hidden_frames_total += len(dataset.idxs['ph'])
 

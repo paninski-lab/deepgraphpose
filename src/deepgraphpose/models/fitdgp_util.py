@@ -6,6 +6,7 @@ from deeplabcut.utils import auxiliaryfunctions
 import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 import cv2
+import random
 
 vers = (tf.__version__).split(".")
 if int(vers[0]) == 1 and int(vers[1]) > 12:
@@ -164,14 +165,28 @@ def gen_batch(visible_frame_total, hidden_frame_total, all_frame_total, dgp_cfg,
     n_datasets = len(all_frame_total)
     nepoch = np.min([int(n_frames_total * dgp_cfg.n_times_all_frames /
                                 batch_size), maxiters])
-    batch_ind_all = np.empty((0, batch_size + 1))
+
+    print('nepoch: ', nepoch)
+    print('n_datasets: ', n_datasets)
+
+    batch_ind_all = []#np.empty((0, batch_size + 1))
     for i in range(n_datasets):
         index_v_i = visible_frame_total[i]
         index_vh_i = list(all_frame_total[i]) + list(hidden_frame_total[i])
         index_all_i = np.unique(list(index_v_i) + list(index_vh_i))
-        batch_ind = np.random.randint(0,
-                                      len(index_all_i) - batch_size,
-                                      size=int(nepoch / n_datasets))
+
+        batch_size = dgp_cfg.batch_size
+        batchsize_i = max([1, int(nepoch / n_frames_total * len(index_all_i))])
+
+        if len(index_all_i) < batch_size:
+            batch_ind = np.random.randint(0, len(index_all_i),
+                                          size=batchsize_i)
+            batch_size = 1
+        else:
+            batch_ind = np.random.randint(0,
+                                          len(index_all_i) - batch_size,
+                                          size=batchsize_i)
+
         adds = np.linspace(0, batch_size - 1, batch_size)
         batch_ind = batch_ind.reshape(-1, 1) + adds.reshape(1, -1)
 
@@ -180,9 +195,9 @@ def gen_batch(visible_frame_total, hidden_frame_total, all_frame_total, dgp_cfg,
         batch_ind = np.hstack((batch_ind, i * np.ones(
             (batch_ind.shape[0], 1))))
 
-        batch_ind_all = np.vstack((batch_ind, batch_ind_all))
+        batch_ind_all += [b.astype(np.int32) for b in batch_ind]
 
-    batch_ind_all = batch_ind_all[np.random.permutation(batch_ind_all.shape[0]), :].astype(np.int32)
+    batch_ind_all = random.sample(batch_ind_all, len(batch_ind_all))
 
     return batch_ind_all
 
@@ -363,11 +378,11 @@ def argmax_2d_from_cm(tensor, nj, gamma=1, gauss_len=2, th=None):
 
     if th is not None:
         st = TF.reshape(TF.transpose(softmax_tensor, [0, 3, 1, 2]),
-                        [-1, softmax_tensor.shape[1], softmax_tensor.shape[2]])
+                        [-1, H, W])
         mst = TF.expand_dims(TF.expand_dims(TF.reduce_max(TF.reduce_max(st, 1), 1), 1), 1)
 
         softmax_tensor_th = TF.where(st < mst * th, TF.zeros_like(st) * 0, st)
-        softmax_tensor_th = TF.reshape(softmax_tensor_th, [-1, nj, softmax_tensor.shape[1], softmax_tensor.shape[2]])
+        softmax_tensor_th = TF.reshape(softmax_tensor_th, [-1, nj, H, W])
         softmax_tensor = TF.transpose(softmax_tensor_th, [0, 2, 3, 1])
         softmax_tensor_sum = TF.reduce_sum(softmax_tensor, [1, 2])
         softmax_tensor_sum = TF.expand_dims(TF.expand_dims(softmax_tensor_sum, 1), 1)

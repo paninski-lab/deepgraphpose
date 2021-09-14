@@ -107,8 +107,13 @@ skeleton:
 ```
 5. Run the DGP pipeline by running the following command:
 ```python
-python ['{DGP_DIR}/demo/run_dgp_demo.py'] --dlcpath "{PROJ_DIR}/task-scorer-date/" --shuffle 'the shuffle to run' --dlcsnapshot 'specify the DLC snapshot if you\'ve already run DLC with location refinement'
+python ['{DGP_DIR}/demo/run_dgp_demo.py'] --dlcpath '{PROJ_DIR}/task-scorer-date/' --shuffle 'the shuffle to run' --dlcsnapshot 'specify the DLC snapshot if you\'ve already run DLC with location refinement'
 ```
+*** You can run the demo with the example project in the test mode to check the runnability of the code
+```python
+python {DGP_DIR}/demo/run_dgp_demo.py --dlcpath {DGP_DIR}/data/Reaching-Mackenzie-2018-08-30 --test
+```
+
 6. The output of the pipeline, including the labeled videos and the pickle files with predicted trajectories will be stored in "{PROJ_DIR}/task-scorer-date/videos_pred".
 
 ## Try DGP on the cloud:

@@ -6,6 +6,7 @@ import scipy.io as sio
 import numpy as np
 from pathlib import Path
 from datetime import datetime as dt
+from os.path import isfile, join, split
 
 from PoseDataLoader import DataLoader
 from src.deepgraphpose import get_model_config, get_train_config
@@ -27,7 +28,7 @@ def store_train_labels(task, date, shuffle):
     data = sio.loadmat(filename)
     data = data["dataset"][0]
     # n_frames = len(data)
-    train_data = [int(dat_[0][0].split(".")[0].split("/")[-1][3:]) for dat_ in data]
+    train_data = [int(split(dat_[0][0].split(".")[0])[-1][3:]) for dat_ in data]
     train_data = np.sort(train_data)
 
     assert len(train_data) > 0
