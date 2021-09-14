@@ -160,6 +160,8 @@ if __name__ == '__main__':
     snapshot = input_params.snapshot
     video_path = input_params.video_path
 
+    cfg_yaml =  dlcpath / 'config.yaml'
+
 
 
     # ------------------------------------------------------------------------------------
@@ -186,7 +188,6 @@ if __name__ == '__main__':
         ==========================
         '''
         , flush=True)
-    snapshot_path, cfg_yaml = get_snapshot_path(snapshot, dlcpath, shuffle=shuffle)
     cfg = auxiliaryfunctions.read_config(cfg_yaml)
     if not (os.path.exists(video_path)):
         print(video_path + " does not exist!")
@@ -206,6 +207,6 @@ if __name__ == '__main__':
         plot_dgp(str(video_file),
                  str(video_pred_path),
                  proj_cfg_file=str(cfg_yaml),
-                 dgp_model_file=str(snapshot_path),
+                 dgp_model_file=str(snapshot),
                  shuffle=shuffle)
     
