@@ -159,6 +159,7 @@ if __name__ == '__main__':
     shuffle = input_params.shuffle
     snapshot = input_params.snapshot
     video_path = input_params.video_path
+    video_path_out = input_params.video_path_out
 
 
     print(dlcpath)
@@ -206,7 +207,7 @@ if __name__ == '__main__':
                     f.find('avi') > 0 or f.find('mp4') > 0 or f.find('mov') > 0 or f.find(
                 'mkv') > 0)
         ]
-    video_pred_path = str(Path(dlcpath) / 'videos_pred')
+    video_pred_path = video_path_out
     if not os.path.exists(video_pred_path):
         os.makedirs(video_pred_path)
     print('video_sets', video_sets, flush=True)
