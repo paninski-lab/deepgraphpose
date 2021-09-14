@@ -235,9 +235,12 @@ if __name__ == '__main__':
                  proj_cfg_file=str(cfg_yaml),
                  dgp_model_file=str(snapshot),
                  shuffle=shuffle)
-        videooutname = video_file.split(".")[0] + "_dgp_labeled.mp4"
+
+                 
+        filename = video_pred_path + "/" + os.path.basename(video_file)
+        videooutname = filename.split(".")[0] + "_dgp_labeled.mp4"
         clip = vp(fname=video_file,sname=videooutname)
-        filepath = video_file.split(".")[0] + "_labeled.h5"
+        filepath = filename.split(".")[0] + "_labeled.h5"
         df = pd.read_hdf(filepath)
 
         labeled_bpts = [
