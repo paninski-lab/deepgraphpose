@@ -164,7 +164,7 @@ if __name__ == '__main__':
     print(dlcpath)
 
 
-    cfg_yaml =  dlcpath / 'config.yaml'
+    cfg_yaml =  dlcpath + '/config.yaml'
 
 
     print(cfg_yaml)
