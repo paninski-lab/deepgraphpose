@@ -242,7 +242,7 @@ if __name__ == '__main__':
         videooutname = filename.split(".")[0] + "_dgp_labeled.mp4"
         print("VIDEO OUT NAME")
         print(videooutname)
-        fourcc = cv2.cv.CV_FOURCC(*'mp4v')
+        fourcc = cv2.CV_FOURCC(*'XVID')
         clip = vp(fname=video_file,sname=videooutname,codec=fourcc)
         filepath = filename.split(".")[0] + "_labeled.h5"
         df = pd.read_hdf(filepath)
