@@ -12,6 +12,7 @@ from os.path import isfile, join, split
 from pathlib import Path
 import sys
 import yaml
+import cv2
 
 import pandas as pd
 from deeplabcut.utils.video_processor import (
@@ -241,7 +242,8 @@ if __name__ == '__main__':
         videooutname = filename.split(".")[0] + "_dgp_labeled.mp4"
         print("VIDEO OUT NAME")
         print(videooutname)
-        clip = vp(fname=video_file,sname=videooutname,codec="avc1")
+        fourcc = cv2.cv.CV_FOURCC(*'mp4v')
+        clip = vp(fname=video_file,sname=videooutname,codec=fourcc)
         filepath = filename.split(".")[0] + "_labeled.h5"
         df = pd.read_hdf(filepath)
 
