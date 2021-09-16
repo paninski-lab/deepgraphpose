@@ -53,6 +53,9 @@ if __name__ == '__main__':
         help="size of the batch, if there are memory issues, decrease it value")
     parser.add_argument("--test", action='store_true', default=False)
 
+    parser.add_argument("--split", action = "store_true",help = "whether or not we should run inference on chopped up videos")
+    parser.add_argument("--splitlength", default = 6000, help= "number of frames in block if splitting videos. ")
+
     input_params = parser.parse_known_args()[0]
     print(input_params)
 
@@ -61,6 +64,8 @@ if __name__ == '__main__':
     dlcsnapshot = input_params.dlcsnapshot
     batch_size = input_params.batch_size
     test = input_params.test
+    splitflag,splitlength = input_params.split,input_params.splitlength 
+
 
     # update config files
     dlcpath = update_config_files_general(dlcpath,shuffle)
@@ -109,6 +114,14 @@ if __name__ == '__main__':
             os.makedirs(video_pred_path)
 
         print('video_sets', video_sets, flush=True)
+        if splitflag: 
+            video_cut_path = str(Path(dlcpath) / 'videos_cut')
+            if not os.path.exists(video_cut_path):
+                os.makedirs(video_cut_path)
+            clip_sets = []
+            for v in video_sets: 
+               clip_sets.extend(split_video(v,int(splitlength),suffix = "demo",outputloc = video_cut_path))
+            video_sets = clip_sets ## replace video_sets with clipped versions.   
 
         if test:
             for video_file in [video_sets[0]]:
