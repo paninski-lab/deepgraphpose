@@ -25,6 +25,7 @@ from deeplabcut.utils import auxiliaryfunctions
 from deepgraphpose.models.fitdgp import fit_dlc, fit_dgp, fit_dgp_labeledonly
 from deepgraphpose.models.fitdgp_util import get_snapshot_path
 from deepgraphpose.models.eval import plot_dgp
+from deepgraphpose.contrib.segment_videos import split_video
 from run_dgp_demo import update_config_files_general
 
 if __name__ == '__main__':
@@ -39,10 +40,10 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
-        "--dlcsnapshot",
+        "--snapshot",
         type=str,
         default=None,
-        help="use the DLC snapshot to initialize DGP",
+        help="use snapshot for prediction. If not given, assumes `snapshot-step2-final--0`",
     )
 
     parser.add_argument("--shuffle", type=int, default=1, help="Project shuffle")
@@ -61,7 +62,13 @@ if __name__ == '__main__':
 
     dlcpath = input_params.dlcpath
     shuffle = input_params.shuffle
-    dlcsnapshot = input_params.dlcsnapshot
+    if input_params.snapshot is not None:
+        snapshot = input_params.snapshot
+    else:
+        ## Specifying snapshot as the end product of training.  
+        step = 2
+        snapshot = 'snapshot-step{}-final--0'.format(step)
+
     batch_size = input_params.batch_size
     test = input_params.test
     splitflag,splitlength = input_params.split,input_params.splitlength 
@@ -71,9 +78,6 @@ if __name__ == '__main__':
     dlcpath = update_config_files_general(dlcpath,shuffle)
     update_configs = True
 
-    ## Specifying snapshot manually at the moment assuming training. 
-    step = 2
-    snapshot = 'snapshot-step{}-final--0'.format(step)
 
     try:
 
@@ -113,15 +117,17 @@ if __name__ == '__main__':
         if not os.path.exists(video_pred_path):
             os.makedirs(video_pred_path)
 
-        print('video_sets', video_sets, flush=True)
         if splitflag: 
             video_cut_path = str(Path(dlcpath) / 'videos_cut')
             if not os.path.exists(video_cut_path):
                 os.makedirs(video_cut_path)
-            clip_sets = []
-            for v in video_sets: 
-               clip_sets.extend(split_video(v,int(splitlength),suffix = "demo",outputloc = video_cut_path))
+                clip_sets = []
+                for v in video_sets: 
+                   clip_sets.extend(split_video(v,int(splitlength),suffix = "demo",outputloc = video_cut_path))
+            else:    
+                clip_sets = [os.path.join(video_cut_path,v) for v in os.listdir(video_cut_path)]
             video_sets = clip_sets ## replace video_sets with clipped versions.   
+        print('video_sets', video_sets, flush=True)
 
         if test:
             for video_file in [video_sets[0]]:
