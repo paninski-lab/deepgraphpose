@@ -242,7 +242,7 @@ if __name__ == '__main__':
         videooutname = filename.split(".")[0] + "_dgp_labeled.mp4"
         print("VIDEO OUT NAME")
         print(videooutname)
-        clip = vp(fname=video_file,sname=videooutname,codec="avc1")
+        clip = vp(fname=video_file,sname=videooutname,codec="mp4v")
         filepath = filename.split(".")[0] + "_labeled.h5"
         df = pd.read_hdf(filepath)
 
