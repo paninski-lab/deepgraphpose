@@ -31,7 +31,6 @@ Activate the dgp conda environment and navigate to the parent directory to insta
 ```
 source activate dgp
 
-pip install deeplabcut==2.1.4
 pip install opencv-python==3.4.5.20
 pip install scipy==1.2.1
 pip install matplotlib==3.0.3
