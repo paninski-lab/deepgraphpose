@@ -24,22 +24,11 @@ Follow the installation instructions [here](https://github.com/paninski-lab/deep
 For example, if you are using Ubuntu OS with available GPUs, you can run the following:
 ```
 cd deepgraphpose/src/DeepLabCut/conda-environments/
-conda env create -f dgp-ubuntu-GPU-clean.yaml
+conda env create -f dgp-ubuntu-GPU.yaml
 ```
-This only creates an empty conda env. We need to manually install packages with specific versions as follows (this is because DGP is maintained with some old-version packages):
 Activate the dgp conda environment and navigate to the parent directory to install the DLC clone inside DGP:
 ```
 source activate dgp
-
-pip install deeplabcut==2.1.4
-pip install opencv-python==3.4.5.20
-pip install scipy==1.2.1
-pip install matplotlib==3.0.3
-pip install tensorflow-gpu==1.13.1
-pip install tensorflow==1.15
-pip install imgaug==0.4.0
-pip install https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04/wxPython-4.0.3-cp36-cp36m-linux_x86_64.whl
-
 cd ../
 pip install -e .
 ```
@@ -47,6 +36,11 @@ Next, install DGP in dev mode:
 ```
 cd ../..
 pip install -e .
+```
+
+Install wx:
+```
+conda install -c anaconda wxpython
 ```
 
 Check that both packages were installed:
