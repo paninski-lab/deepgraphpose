@@ -47,17 +47,6 @@ Next, install DGP in dev mode:
 cd ../..
 pip install -e .
 ```
-
-Check that both packages were installed:
-```python
-ipython
-import deeplabcut 
-print(deeplabcut.__path__)
-['{DGP_DIR}/deepgraphpose/src/DeepLabCut/deeplabcut']
-import deepgraphpose
-print(deepgraphpose.__path__)
-['{DGP_DIR}/deepgraphpose/src/deepgraphpose']
-```
 Finally, download the resnet weights to train the network:
 ```
 curl http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz | tar xvz -C src/DeepLabCut/deeplabcut/pose_estimation_tensorflow/models/pretrained/
@@ -78,6 +67,18 @@ On a remote server, install dlc/dgp in light mode by running:
 export DLClight=True
 ```
 before you begin the installation process of dgp.
+
+
+Check that both packages were installed:
+```python
+ipython
+import deeplabcut 
+print(deeplabcut.__path__)
+['{DGP_DIR}/deepgraphpose/src/DeepLabCut/deeplabcut']
+import deepgraphpose
+print(deepgraphpose.__path__)
+['{DGP_DIR}/deepgraphpose/src/deepgraphpose']
+```
 
 ## To Run DGP on your videos:
 1. Use DLC's GUI to collect labels as described [here](https://github.com/paninski-lab/deepgraphpose/blob/main/src/DeepLabCut/docs/UseOverviewGuide.md). This step should create a project folder: "{PROJ_DIR}/task-scorer-date" and a folder with your labeled data  "{PROJ_DIR}/task-scorer-date/labeled-data". If you label frames from multiple videos, the GUI should automatically create folders corresponding to each video which contain *.csv, *.h5 files and *.png files with information from the manual labels.
