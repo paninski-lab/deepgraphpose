@@ -4,7 +4,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+import tf_slim as slim
 import yaml
 from moviepy.editor import VideoFileClip
 from skimage.draw import circle
@@ -18,7 +18,7 @@ if int(vers[0]) == 1 and int(vers[1]) > 12:
     TF = tf.compat.v1
 else:
     TF = tf
-config = tf.ConfigProto()
+config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
 
 
@@ -112,7 +112,7 @@ def create_annotated_movie(clip, df_x, df_y, mask_array=None, dotsize=5, colorma
 
         return frame
 
-    clip_marked = clip.fl(add_marker)
+    clip_marked = clip.transform(add_marker)
 
     clip_marked.write_videofile(str(filename), codec="mpeg4", fps=fps, bitrate="1000k")
     clip_marked.close()
@@ -169,42 +169,41 @@ def setup_dgp_eval_graph(dlc_cfg, dgp_model_file, loc_ref=False, gauss_len=1, ga
         inputs (tf.Tensor)
 
     """
-    from deeplabcut.pose_estimation_tensorflow.nnet.net_factory import pose_net
+    from deeplabcut.pose_estimation_tensorflow.nnets import PoseNetFactory
     from deepgraphpose.models.fitdgp_util import argmax_2d_from_cm, dgp_prediction_layer
 
     # -------------------
     # define model
     # -------------------
-    TF.reset_default_graph()
-    inputs = TF.placeholder(tf.float32, shape=[1, None, None, 3])
-    pn = pose_net(dlc_cfg)
+    TF.compat.v1.reset_default_graph()
+    inputs = TF.compat.v1.placeholder(tf.float32, shape=[1, None, None, 3])
+    pn = PoseNetFactory.create(dlc_cfg)
     # extract resnet outputs
     net, end_points = pn.extract_features(inputs)
 
-    with tf.variable_scope('pose', reuse=None):
+    with tf.compat.v1.variable_scope('pose', reuse=None):
         scmap = dgp_prediction_layer(None, None, dlc_cfg, net, name='part_pred',
-            num_outputs=dlc_cfg.num_joints, init_flag=False, nc=None, train_flag=True,
-            stride=dlc_cfg.deconvolutionstride)
+            num_outputs=dlc_cfg['num_joints'], init_flag=False, nc=None, train_flag=True)
         if loc_ref:
             locref = dgp_prediction_layer(None, None, dlc_cfg, net, name='locref_pred',
-                num_outputs=dlc_cfg.num_joints * 2, init_flag=False, nc=None,
-                train_flag=True, stride=dlc_cfg.deconvolutionstride)
+                num_outputs=dlc_cfg['num_joints'] * 2, init_flag=False, nc=None,
+                train_flag=True)
         else:
             locref = None
     variables_to_restore = slim.get_variables_to_restore()
-    restorer = TF.train.Saver(variables_to_restore)
+    restorer = TF.compat.v1.train.Saver(variables_to_restore)
     weights_location = str(dgp_model_file)
 
-    mu_n, softmax_tensor = argmax_2d_from_cm(scmap, dlc_cfg.num_joints, gamma, gauss_len)
+    mu_n, softmax_tensor = argmax_2d_from_cm(scmap, dlc_cfg['num_joints'], gamma, gauss_len)
 
     # initialize tf session
-    config_TF = TF.ConfigProto()
+    config_TF = TF.compat.v1.ConfigProto()
     config_TF.gpu_options.allow_growth = True
-    sess = TF.Session(config=config_TF)
+    sess = TF.compat.v1.Session(config=config_TF)
 
     # initialize weights
-    sess.run(TF.global_variables_initializer())
-    sess.run(TF.local_variables_initializer())
+    sess.run(TF.compat.v1.global_variables_initializer())
+    sess.run(TF.compat.v1.local_variables_initializer())
 
     # restore resnet from dlc trained weights
     print('loading resnet model weights from %s...' % weights_location, end='')
@@ -269,10 +268,10 @@ def estimate_pose(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle
     # extract pose
     # -------------------
     try:
-        dlc_cfg.net_type = 'resnet_50'
+        dlc_cfg['net_type'] = 'resnet_50'
         sess, mu_n, _, scmap, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
     except:
-        dlc_cfg.net_type = 'resnet_101'
+        dlc_cfg['net_type'] = 'resnet_101'
         sess, mu_n, _, scmap, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
 
     print('\n')
@@ -290,13 +289,13 @@ def estimate_pose(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle
         pbar.update(1)
     """
     # %%
-    nj = dlc_cfg.num_joints
+    nj = dlc_cfg['num_joints']
     nx, ny = video_clip.size
-    nx_out, ny_out = int((nx - dlc_cfg.stride / 2) / dlc_cfg.stride + 1) + 5, int(
-        (ny - dlc_cfg.stride / 2) / dlc_cfg.stride + 1) + 5
+    nx_out, ny_out = int((nx - dlc_cfg['stride'] / 2) / dlc_cfg['stride'] + 1) + 5, int(
+        (ny - dlc_cfg['stride'] / 2) / dlc_cfg['stride'] + 1) + 5
 
     # %%
-    markers = np.zeros((n_frames, dlc_cfg.num_joints, 2))
+    markers = np.zeros((n_frames, dlc_cfg['num_joints'], 2))
 
     mu_likelihoods = np.zeros((n_frames, nj, 2)).astype('int')
     likelihoods = np.zeros((n_frames, nj))
@@ -349,8 +348,8 @@ def estimate_pose(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle
     video_clip.close()
 
     # %%
-    xr = markers[:, :, 1] * dlc_cfg.stride + 0.5 * dlc_cfg.stride  # T x nj
-    yr = markers[:, :, 0] * dlc_cfg.stride + 0.5 * dlc_cfg.stride
+    xr = markers[:, :, 1] * dlc_cfg['stride'] + 0.5 * dlc_cfg['stride']  # T x nj
+    yr = markers[:, :, 0] * dlc_cfg['stride'] + 0.5 * dlc_cfg['stride']
     # %%
     # true xr
     xr *= scale_x
@@ -368,7 +367,7 @@ def estimate_pose(proj_cfg_file, dgp_model_file, video_file, output_dir, shuffle
         if not Path(save_file).parent.exists():
             os.makedirs(os.path.dirname(save_file))
         export_pose_like_dlc(labels, os.path.basename(dgp_model_file),
-                             dlc_cfg.all_joints_names, save_file)
+                             dlc_cfg['all_joints_names'], save_file)
     return labels
 
 
@@ -424,10 +423,10 @@ def estimate_pose_obsolete(proj_cfg_file, dgp_model_file, video_file, output_dir
     # extract pose
     # -------------------
     try:
-        dlc_cfg.net_type = 'resnet_50'
+        dlc_cfg['net_type'] = 'resnet_50'
         sess, mu_n, _, scmap, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
     except:
-        dlc_cfg.net_type = 'resnet_101'
+        dlc_cfg['net_type'] = 'resnet_101'
         sess, mu_n, _, scmap, _, inputs = setup_dgp_eval_graph(dlc_cfg, dgp_model_file)
 
     print('\n')

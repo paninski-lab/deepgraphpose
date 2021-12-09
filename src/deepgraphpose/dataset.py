@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 import scipy.io as sio
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+import tf_slim as slim
 import yaml
 from moviepy.editor import VideoFileClip
 from skimage.util import img_as_ubyte
@@ -320,7 +320,7 @@ class Dataset:
         #                    1.0)
         # TO DO: del
         self.n_frames = calculate_num_frames(self.video_clip)
-        self.nj = self.dlc_config.num_joints
+        self.nj = self.dlc_config['num_joints']
         # to fill upon creating batches
         self.ny_in, self.nx_in = self.video_clip.size
         self.nx_out, self.ny_out = self._compute_pred_dims()  # x, y dims of model output
@@ -348,23 +348,23 @@ class Dataset:
     def _compute_pred_dims(self):
         """Compute output dims of dgp prediction layer by pushing fake data through network."""
         from deepgraphpose.models.fitdgp_util import dgp_prediction_layer
-        from deeplabcut.pose_estimation_tensorflow.nnet.net_factory import pose_net
+        from deeplabcut.pose_estimation_tensorflow.nnets import PoseNetFactory
 
-        TF.reset_default_graph()
+        TF.compat.v1.reset_default_graph()
 
         nc = 3
-        inputs = TF.placeholder(TF.float32, shape=[None, self.nx_in, self.ny_in, nc])
+        inputs = TF.compat.v1.placeholder(TF.float32, shape=[None, self.nx_in, self.ny_in, nc])
 
-        pn = pose_net(self.dlc_config)
+        pn = PoseNetFactory.create(self.dlc_config)
         conv_inputs, end_points = pn.extract_features(inputs)
 
         x = dgp_prediction_layer(
             None, None, self.dlc_config, conv_inputs, 'confidencemap', self.nj, 0,
             nc, 1)
 
-        sess = TF.Session(config=TF.ConfigProto())
-        sess.run(TF.global_variables_initializer())
-        sess.run(TF.local_variables_initializer())
+        sess = TF.compat.v1.Session(config=TF.compat.v1.ConfigProto())
+        sess.run(TF.compat.v1.global_variables_initializer())
+        sess.run(TF.compat.v1.local_variables_initializer())
         feed_dict = {inputs: np.zeros([1, self.nx_in, self.ny_in, nc])}
         x_np = sess.run(x, feed_dict)
 
@@ -586,14 +586,13 @@ class Dataset:
 
     def _compute_targets(self):
 
-        from deeplabcut.pose_estimation_tensorflow.dataset.factory import \
-            create as create_dataset
+        from deeplabcut.pose_estimation_tensorflow.datasets import PoseDatasetFactory
 
         dlc_config = copy.deepcopy(self.dlc_config)
         dlc_config['deterministic'] = True
         # switch to default dataset_type to produce expected batch output
-        dlc_config['dataset_type'] = 'default'
-        dataset = create_dataset(dlc_config)
+        dlc_config['dataset_type'] = 'deterministic'
+        dataset = PoseDatasetFactory.create(dlc_config)
         nt = len(self.idxs['vis']['train'])  # number of training frames
         # assert nt >= 1
         nj = max([dat_.joints[0].shape[0] for dat_ in dataset.data])
@@ -617,7 +616,6 @@ class Dataset:
             # pairwise_targets = 5
             # pairwise_mask = 6
             # data_item = 7
-
             im_path = data[data_keys[5]].im_path
             # skip if frame belongs to another video
             im_path_split = os.path.normpath(im_path).split(os.sep)
@@ -837,11 +835,12 @@ class MultiDataset:
         if video_sets is None:
             self.proj_config['video_path'] = self.proj_config['video_sets']  # backwards compat
         else:
+            print(self.proj_config['video_sets'])
             video_set_keys = self.proj_config['video_sets'].keys()
             video_set_keys = [split(v)[-1] for v in video_set_keys]
-            #print('video_set_keys: ', video_set_keys)
+            print('video_set_keys: ', video_set_keys)
             video_set_input = [split(v)[-1] for v in video_sets]
-            #print('video_set_input: ', video_set_input)
+            print('video_set_input: ', video_set_input)
             if set(video_set_keys)==set(video_set_input):
                 self.proj_config['video_path'] = self.proj_config['video_sets']
             else:
@@ -853,19 +852,24 @@ class MultiDataset:
             join(self.proj_config['project_path'], key): val
             for key, val in self.proj_config['video_sets'].items()
         }
+        print(self.proj_config['video_sets'])
+        print("project path")
+        print(self.proj_config['project_path'])
 
         self.dlc_config = get_train_config(self.proj_config, shuffle)
 
         # save path info
-        self.paths['project'] = Path(self.dlc_config.project_path)
-        self.paths['dlc_model'] = Path(self.dlc_config.snapshot_prefix).parent
+        self.paths['project'] = Path(self.dlc_config['project_path'])
+        self.paths['dlc_model'] = Path(self.dlc_config['snapshot_prefix']).parent
         self.paths['batched_data'] = ''
 
         # create a dataset for each video
         self.video_files = self.proj_config['video_sets'].keys()
+        print(self.proj_config['video_sets'])
         assert len(self.video_files) > 0
         self.batch_ratios = []
         for video_file in self.video_files:
+            print(video_file)
             self.datasets.append(Dataset(video_file, self.dlc_config, self.paths))
             self.batch_ratios.append(len(self.datasets[-1].idxs['vis']['train']))
         self.batch_ratios = np.array(self.batch_ratios) / np.sum(self.batch_ratios)

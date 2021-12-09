@@ -107,8 +107,7 @@ def get_model_cfg_path(base_path, dtype):
 
 def get_init_weights_path(base_path):
     return join(
-        base_path, 'src', 'DeepLabCut', 'deeplabcut', 'pose_estimation_tensorflow',
-        'models', 'pretrained', 'resnet_v1_50.ckpt')
+        base_path, 'resnet_v1_50.ckpt')
 
 
 if __name__ == '__main__':
@@ -133,7 +132,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=10,
+        default=1,
         help="size of the batch, if there are memory issues, decrease it value")
     parser.add_argument("--test", action='store_true', default=False)
 
@@ -143,7 +142,7 @@ if __name__ == '__main__':
     dlcpath = input_params.dlcpath
     shuffle = input_params.shuffle
     dlcsnapshot = input_params.dlcsnapshot
-    batch_size = input_params.batch_size
+    batch_size = input_params.batch_size 
     test = input_params.test
 
     update_configs = False
@@ -155,6 +154,10 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------
     # Train models
     # ------------------------------------------------------------------------------------
+    import tensorflow as tf
+    config = tf.compat.v1.ConfigProto()
+    config.gpu_options.allow_growth = True
+    sess = tf.compat.v1.Session(config=config)
 
     try:
 
@@ -177,7 +180,7 @@ if __name__ == '__main__':
                         displayiters=1)
             else:
                 fit_dlc(snapshot, dlcpath, shuffle=shuffle, step=0)
-            snapshot = 'snapshot-step0-final--0'  # snapshot for step 1
+            snapshot = 'snapshot-step0-final-0'  # snapshot for step 1
 
         else:  # use the specified DLC snapshot to initialize DGP, and skip step 0
             snapshot = dlcsnapshot  # snapshot for step 1
@@ -200,7 +203,7 @@ if __name__ == '__main__':
                                 dlcpath,
                                 shuffle=shuffle,
                                 step=1,
-                                maxiters=2,
+                                maxiters=1000,
                                 displayiters=1)
         else:
             fit_dgp_labeledonly(snapshot,
@@ -208,7 +211,7 @@ if __name__ == '__main__':
                                 shuffle=shuffle,
                                 step=1)
 
-        snapshot = 'snapshot-step1-final--0'
+        snapshot = 'snapshot-step1-final-0'
         # %% step 2 DGP
         print(
             '''
@@ -244,7 +247,7 @@ if __name__ == '__main__':
                     gm2=gm2,
                     gm3=gm3)
 
-        snapshot = 'snapshot-step{}-final--0'.format(step)
+        snapshot = 'snapshot-step{}-final-0'.format(step)
 
         # --------------------------------------------------------------------------------
         # Test DGP model

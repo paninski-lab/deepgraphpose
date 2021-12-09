@@ -105,8 +105,8 @@ def get_train_config(cfg, shuffle=0):
             "It seems the model for shuffle %s and trainFraction %s does not exist."
             % (shuffle, TrainingFraction))
     # from get_model_config
-    dlc_cfg.video_path = cfg['video_path']
-    dlc_cfg.project_path = cfg['project_path']
+    dlc_cfg['video_path'] = cfg['video_path']
+    dlc_cfg['project_path'] = cfg['project_path']
     return dlc_cfg
 
 

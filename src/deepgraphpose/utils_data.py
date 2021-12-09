@@ -95,7 +95,7 @@ def local_extract_frames_md(
     config_path,
     frames2pick,
     video,
-    crop=False,
+    crop=True,
     opencv=True,
     full_path=False,
 ):
