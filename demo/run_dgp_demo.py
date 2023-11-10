@@ -21,11 +21,68 @@ if sys.platform == 'darwin':
 os.environ["DLClight"] = "True"
 os.environ["Colab"] = "True"
 from deeplabcut.utils import auxiliaryfunctions
-
+from deepgraphpose.contrib.segment_videos import split_video
 from deepgraphpose.models.fitdgp import fit_dlc, fit_dgp, fit_dgp_labeledonly
 from deepgraphpose.models.fitdgp_util import get_snapshot_path
 from deepgraphpose.models.eval import plot_dgp
 
+
+def update_config_files_general(dlcpath,shuffle):
+    """General purpose version of the function below that applies to all models, not just the default reachingvideo. 
+    Requires in addition to the dlc path parameters from the project config file:
+
+    """
+    base_path = os.getcwd()
+
+    # project config
+    proj_cfg_path = os.path.join(base_path, dlcpath, 'config.yaml')
+    with open(proj_cfg_path, 'r') as f:
+        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
+        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
+        task = yaml_cfg["Task"]
+        TrainingFraction = yaml_cfg["TrainingFraction"][0] ## Train with the first training fraction. 
+        date = yaml_cfg["date"]
+        try:
+            video_locs = yaml_cfg["video_sets"]
+            #full_sets = {os.path.join(base_path,dlcpath,vl):cropdata for vl,cropdata in video_locs.items()}
+            ## TODO Test this bottom line: assume videos are correctly located in the directory's videos subdir. 
+            full_sets = {os.path.join(base_path,dlcpath,"videos",os.path.basename(vl)):cropdata for vl,cropdata in video_locs.items()}
+            yaml_cfg["video_sets"] = full_sets
+        except KeyError:    
+            print("no videos given.")
+
+    #    video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
+    #    try:
+    #        yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
+    #    except KeyError:    
+    #        ## check if update has already been done. 
+    #        assert yaml_cfg["video_sets"].get(video_loc,False), "Can't find original or updated video path in config file."
+    with open(proj_cfg_path, 'w') as f:
+        yaml.dump(yaml_cfg, f)
+
+    # train model config
+    projectname = "{t}{d}-trainset{tf}shuffle{s}".format(t=task,d=date,tf = int(TrainingFraction*100),s = shuffle)
+    model_cfg_path = get_model_cfg_path_general(base_path, dlcpath, 'train', projectname)
+    with open(model_cfg_path, 'r') as f:
+        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
+        yaml_cfg['init_weights'] = get_init_weights_path(base_path)
+        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
+    with open(model_cfg_path, 'w') as f:
+        yaml.dump(yaml_cfg, f)
+
+    # download resnet weights if necessary
+    if not os.path.exists(yaml_cfg['init_weights']):
+        raise FileNotFoundError('Must download resnet-50 weights; see README for instructions')
+
+    # test model config
+    model_cfg_path = get_model_cfg_path_general(base_path, dlcpath, 'test', projectname)
+    with open(model_cfg_path, 'r') as f:
+        yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
+        yaml_cfg['init_weights'] = get_init_weights_path(base_path)
+    with open(model_cfg_path, 'w') as f:
+        yaml.dump(yaml_cfg, f)
+
+    return os.path.join(base_path, dlcpath)
 
 def update_config_files(dlcpath):
     base_path = os.getcwd()
@@ -34,12 +91,13 @@ def update_config_files(dlcpath):
     proj_cfg_path = join(base_path, dlcpath, 'config.yaml')
     with open(proj_cfg_path, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.SafeLoader)
-        yaml_cfg['project_path'] = join(base_path, dlcpath)
-        video_loc = join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
+        yaml_cfg['project_path'] = os.path.join(base_path, dlcpath)
+        video_loc = os.path.join(base_path, dlcpath, 'videos', 'reachingvideo1.avi')
         try:
-            yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop(join('videos','reachingvideo1.avi'))
-        except:
-            yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop(video_loc)
+            yaml_cfg['video_sets'][video_loc] = yaml_cfg['video_sets'].pop('videos/reachingvideo1.avi')
+        except KeyError:    
+            ## check if update has already been done. 
+            assert yaml_cfg["video_sets"].get(video_loc,False), "Can't find original or updated video path in config file."
     with open(proj_cfg_path, 'w') as f:
         yaml.dump(yaml_cfg, f)
 
@@ -104,6 +162,14 @@ def get_model_cfg_path(base_path, dtype):
         base_path, dlcpath, 'dlc-models', 'iteration-0', 'ReachingAug30-trainset95shuffle1',
         dtype, 'pose_cfg.yaml')
 
+def get_model_cfg_path_general(base_path, dlcpath, dtype, projectname):
+    """General purpose version of get_model_cfg_path that can work with non-demo projects. 
+
+    """
+    return os.path.join(
+        base_path, dlcpath, 'dlc-models', 'iteration-0', projectname,
+        dtype, 'pose_cfg.yaml')
+
 
 def get_init_weights_path(base_path):
     return join(
@@ -136,6 +202,8 @@ if __name__ == '__main__':
         default=10,
         help="size of the batch, if there are memory issues, decrease it value")
     parser.add_argument("--test", action='store_true', default=False)
+    parser.add_argument("--split", action = "store_true",help = "whether or not we should run inference on chopped up videos")
+    parser.add_argument("--splitlength", default = 6000, help= "number of frames in block if splitting videos. ")
 
     input_params = parser.parse_known_args()[0]
     print(input_params)
@@ -145,12 +213,11 @@ if __name__ == '__main__':
     dlcsnapshot = input_params.dlcsnapshot
     batch_size = input_params.batch_size
     test = input_params.test
+    splitflag,splitlength = input_params.split,input_params.splitlength 
 
-    update_configs = False
-    if dlcpath == join('data','Reaching-Mackenzie-2018-08-30'):
-        # update config files
-        dlcpath = update_config_files(dlcpath)
-        update_configs = True
+    # update config files
+    dlcpath = update_config_files_general(dlcpath,shuffle)
+    update_configs = True
 
     # ------------------------------------------------------------------------------------
     # Train models
@@ -283,6 +350,14 @@ if __name__ == '__main__':
             os.makedirs(video_pred_path)
 
         print('video_sets', video_sets, flush=True)
+        if splitflag: 
+            video_cut_path = str(Path(dlcpath) / 'videos_cut')
+            if not os.path.exists(video_cut_path):
+                os.makedirs(video_cut_path)
+            clip_sets = []
+            for v in video_sets: 
+               clip_sets.extend(split_video(v,int(splitlength),suffix = "demo",outputloc = video_cut_path))
+            video_sets = clip_sets ## replace video_sets with clipped versions.   
 
         if test:
             for video_file in [video_sets[0]]:
@@ -309,6 +384,7 @@ if __name__ == '__main__':
                          dgp_model_file=str(snapshot_path),
                          shuffle=shuffle)
     finally:
+        pass
 
-        if update_configs:
-            return_configs()
+        #if update_configs:
+        #    return_configs()
